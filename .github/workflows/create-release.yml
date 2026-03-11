@@ -1,0 +1,68 @@
+name: Create GitHub Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  packages: read
+
+jobs:
+  create-release:
+    runs-on: home-ops
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+
+      - name: Extract version info
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version_number=${VERSION#v}" >> $GITHUB_OUTPUT
+
+          if [[ "$VERSION" =~ (alpha|beta|rc|dev) ]]; then
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate changelog
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          if [[ -n "$PREV_TAG" ]]; then
+            echo "## Changes since $PREV_TAG" > changelog.md
+            echo "" >> changelog.md
+            git log --pretty=format:"- %s (%h)" "$PREV_TAG..HEAD" >> changelog.md
+            printf "\n\n" >> changelog.md
+          else
+            printf "## Initial Release\n\nFirst release of scan!\n\n" > changelog.md
+          fi
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@b7eabc95ff50cbeeedec83973935c8f306dfcd0b # v1
+        with:
+          name: scan ${{ steps.version.outputs.version }}
+          bodyFile: changelog.md
+          draft: false
+          prerelease: ${{ steps.version.outputs.prerelease }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          allowUpdates: true
+
+      - name: Create summary
+        run: |
+          {
+            echo "## 🎉 GitHub Release Created"
+            echo ""
+            echo "**Version:** ${{ steps.version.outputs.version }}"
+            echo "**Prerelease:** ${{ steps.version.outputs.prerelease }}"
+            echo ""
+            echo "**Release URL:** https://github.com/phew-blue/scan/releases/tag/${{ steps.version.outputs.version }}"
+            echo ""
+            echo "🐳 Docker image will be built automatically and available shortly at:"
+            echo "\`ghcr.io/phew-blue/scan:${{ steps.version.outputs.version }}\`"
+          } >> $GITHUB_STEP_SUMMARY

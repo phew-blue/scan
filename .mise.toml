@@ -1,0 +1,5 @@
+[tools]
+go = "1.23"
+node = "24"
+pnpm = "latest"
+"go:github.com/pressly/goose/v3/cmd/goose" = "latest"

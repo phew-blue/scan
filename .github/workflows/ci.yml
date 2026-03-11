@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    tags: ["v*"]
+    branches: [dev]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  lint:
+    name: Go lint & test
+    runs-on: home-ops
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test ./...
+
+  frontend-check:
+    name: Frontend type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+        working-directory: frontend
+      - run: pnpm run check-types
+        working-directory: frontend
+
+  build:
+    name: Build & push
+    needs: [lint, frontend-check]
+    runs-on: home-ops
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Log in to Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/phew-blue/scan
+          tags: |
+            type=raw,value={{tag}},enable=${{ startsWith(github.ref, 'refs/tags/') }}
+            type=semver,pattern=v{{major}}.{{minor}}
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') && !contains(github.ref, 'alpha') && !contains(github.ref, 'beta') && !contains(github.ref, 'rc') }}
+            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        id: build
+        with:
+          context: .
+          platforms: linux/amd64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: BUILD_VERSION=${{ steps.meta.outputs.version }}
+          provenance: false
+          cache-from: type=gha,scope=scan
+          cache-to: type=gha,mode=max,scope=scan
+      - name: Create summary
+        if: github.event_name != 'pull_request'
+        run: |
+          {
+            echo "## ✅ ghcr.io/phew-blue/scan:${{ steps.meta.outputs.version }}@${{ steps.build.outputs.digest }}"
+            echo ""
+            echo "**Tags pushed:**"
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY

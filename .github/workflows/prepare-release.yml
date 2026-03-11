@@ -1,0 +1,62 @@
+name: Prepare Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g. v0.2.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  prepare-release:
+    runs-on: home-ops
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          token: ${{ secrets.GH_PAT }}
+          ref: dev
+
+      - name: Validate version format
+        run: |
+          if [[ ! "${{ inputs.version }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            echo "Invalid version format: ${{ inputs.version }}"
+            exit 1
+          fi
+
+      - name: Bump versions
+        run: |
+          VERSION="${{ inputs.version }}"
+          VERSION_NUMBER="${VERSION#v}"
+          PREV_VERSION=$(grep -r 'v[0-9]\+\.[0-9]\+\.[0-9]\+' go.mod | head -1 | grep -o 'v[0-9]*\.[0-9]*\.[0-9]*' | head -1 || echo "0.0.0")
+
+          echo "Bumping → $VERSION_NUMBER"
+
+          find . \
+            -not -path "*/.git/*" \
+            -not -path "*/node_modules/*" \
+            -type f \( -name "*.toml" -o -name "*.yaml" -o -name "*.yml" -o -name "*.json" \) \
+            | xargs grep -l "${PREV_VERSION#v}" \
+            | xargs sed -i "s/v${PREV_VERSION#v}/${VERSION}/g; s/${PREV_VERSION#v}/${VERSION_NUMBER}/g"
+
+      - name: Create pull request
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b release/${{ inputs.version }}
+          git add .
+          git commit -m "chore(release): ${{ inputs.version }}"
+          git push origin release/${{ inputs.version }}
+
+          gh pr create \
+            --title "chore(release): ${{ inputs.version }}" \
+            --body "Automated version bump for ${{ inputs.version }}. Merge to trigger auto-tag and release." \
+            --base main \
+            --head release/${{ inputs.version }} \
+            --repo phew-blue/scan

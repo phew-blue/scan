@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: scan
+      POSTGRES_PASSWORD: scan
+      POSTGRES_DB: scan
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scan"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      SCAN_DB_HOST: postgres
+      SCAN_DB_USER: scan
+      SCAN_DB_PASSWORD: scan
+      SCAN_DB_NAME: scan
+      SCAN_OIDC_ISSUER: https://auth.example.com
+      SCAN_OIDC_CLIENT_ID: scan
+      SCAN_OIDC_CLIENT_SECRET: changeme
+      SCAN_OIDC_REDIRECT_URL: http://localhost:8080/auth/callback
+      SCAN_SESSION_SECRET: changeme-32-char-secret-here-ok
+      SCAN_STATIC_DIR: ./frontend/out
+    depends_on:
+      postgres:
+        condition: service_healthy

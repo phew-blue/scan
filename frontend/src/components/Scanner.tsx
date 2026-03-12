@@ -15,8 +15,10 @@ export default function Scanner({ onScan, disabled }: Props) {
   const [cameraError, setCameraError] = useState("");
   const streamRef = useRef<MediaStream | null>(null);
   const readerRef = useRef<unknown>(null);
+  const lastScanRef = useRef<{ barcode: string; time: number } | null>(null);
 
   useEffect(() => {
+    startCamera();
     return () => { stopCamera(); };
   }, []);
 
@@ -46,7 +48,15 @@ export default function Scanner({ onScan, disabled }: Props) {
         await videoRef.current.play();
         setCameraActive(true);
         reader.decodeFromStream(stream, videoRef.current, (result, err) => {
-          if (result && !disabled) onScan(result.getText());
+          if (result && !disabled) {
+            const barcode = result.getText();
+            const now = Date.now();
+            const last = lastScanRef.current;
+            if (!last || last.barcode !== barcode || now - last.time > 2500) {
+              lastScanRef.current = { barcode, time: now };
+              onScan(barcode);
+            }
+          }
           if (err && err.name !== "NotFoundException") console.debug("scan error", err);
         });
       }

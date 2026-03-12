@@ -35,13 +35,14 @@ function JobDetail({ id }: { id: string }) {
   }, [id]);
 
   const handleScan = useCallback(async (barcode: string) => {
+    if (job?.scans.some((s) => s.barcode === barcode)) return;
     try {
       const scan = await api.addScan(id, barcode);
       setJob((prev) => prev ? { ...prev, scans: [...prev.scans, scan] } : prev);
     } catch (err) {
       console.error("add scan failed", err);
     }
-  }, [id]);
+  }, [id, job]);
 
   async function removeScan(scan: Scan) {
     await api.deleteScan(id, scan.id);

@@ -39,6 +39,8 @@ func New(cfg *config.Config, store *db.Store) http.Handler {
 
 	// Auth routes (public)
 	r.Get("/auth/login", s.handleLogin)
+	r.Get("/auth/oidc", s.handleOIDCRedirect)
+	r.Post("/auth/password", s.handlePasswordLogin)
 	r.Get("/auth/callback", s.handleCallback)
 	r.Post("/auth/logout", s.handleLogout)
 

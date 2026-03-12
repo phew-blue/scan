@@ -5,9 +5,11 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -68,7 +70,72 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+var loginTmpl = template.Must(template.New("login").Parse(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Sign in — Scan</title>
+<style>
+  :root { --bg:#080c0f; --surface:#0f1519; --border:#1e2d35; --accent:#00aaff; --accent-dim:#003d5c; --text:#e8eef2; --text-dim:#5a7a8a; --red:#ff4444; }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { font-family:'IBM Plex Mono',monospace; background:var(--bg); color:var(--text); min-height:100dvh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; }
+  .card { width:100%; max-width:360px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:32px 24px; display:flex; flex-direction:column; gap:24px; }
+  .logo { display:flex; align-items:center; gap:10px; }
+  .logo img { width:32px; height:32px; }
+  .logo span { font-size:14px; font-weight:600; letter-spacing:.08em; color:var(--accent); }
+  .divider { display:flex; align-items:center; gap:12px; color:var(--text-dim); font-size:11px; letter-spacing:.1em; }
+  .divider::before, .divider::after { content:''; flex:1; height:1px; background:var(--border); }
+  .btn { width:100%; padding:14px; border-radius:8px; font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:600; letter-spacing:.08em; cursor:pointer; border:1px solid; transition:opacity .15s; }
+  .btn-oidc { background:var(--accent-dim); border-color:var(--accent); color:var(--accent); }
+  .btn-submit { background:var(--accent); border-color:var(--accent); color:#000; }
+  .btn:disabled { opacity:.4; cursor:not-allowed; }
+  input[type=password] { width:100%; padding:14px; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:'IBM Plex Mono',monospace; font-size:16px; outline:none; }
+  input[type=password]:focus { border-color:var(--accent); }
+  .error { color:var(--red); font-size:12px; letter-spacing:.04em; }
+  .form { display:flex; flex-direction:column; gap:10px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <img src="/logo.svg" alt="">
+    <span>BARCODE SCANNER</span>
+  </div>
+  {{if .HasOIDC}}
+  <a href="/auth/oidc" class="btn btn-oidc" style="text-decoration:none;text-align:center;display:block">SIGN IN WITH AUTHELIA</a>
+  {{end}}
+  {{if .HasPassword}}
+  {{if .HasOIDC}}<div class="divider">OR</div>{{end}}
+  <form class="form" method="POST" action="/auth/password">
+    <input type="password" name="password" placeholder="Enter password" autofocus autocomplete="current-password">
+    {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+    <button type="submit" class="btn btn-submit">SIGN IN</button>
+  </form>
+  {{end}}
+</div>
+</body>
+</html>`))
+
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	hasOIDC := s.oauth2Config != nil
+	hasPassword := s.cfg.AccessPassword != ""
+
+	// If only OIDC configured, go straight there
+	if hasOIDC && !hasPassword {
+		s.handleOIDCRedirect(w, r)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	loginTmpl.Execute(w, map[string]any{ //nolint:errcheck
+		"HasOIDC":     hasOIDC,
+		"HasPassword": hasPassword,
+		"Error":       r.URL.Query().Get("error"),
+	})
+}
+
+func (s *Server) handleOIDCRedirect(w http.ResponseWriter, r *http.Request) {
 	state, err := randomString(32)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -84,6 +151,36 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 	})
 	http.Redirect(w, r, s.oauth2Config.AuthCodeURL(state), http.StatusFound)
+}
+
+func (s *Server) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Redirect(w, r, "/auth/login?error=invalid+request", http.StatusFound)
+		return
+	}
+	provided := r.FormValue("password")
+	expected := s.cfg.AccessPassword
+	if subtle.ConstantTimeCompare([]byte(provided), []byte(expected)) != 1 {
+		http.Redirect(w, r, "/auth/login?error=incorrect+password", http.StatusFound)
+		return
+	}
+
+	sess := sessionData{Subject: "guest", Expires: time.Now().Add(sessionTTL)}
+	signed, err := signSession(sess, s.cfg.SessionSecret)
+	if err != nil {
+		http.Error(w, "session error", http.StatusInternalServerError)
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     sessionCookie,
+		Value:    signed,
+		Path:     "/",
+		MaxAge:   int(sessionTTL.Seconds()),
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
+	http.Redirect(w, r, "/", http.StatusFound)
 }
 
 func (s *Server) handleCallback(w http.ResponseWriter, r *http.Request) {

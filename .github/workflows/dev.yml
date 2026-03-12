@@ -62,16 +62,26 @@ jobs:
     needs: [build]
     runs-on: home-ops
     steps:
-      - name: Patch HelmRelease and trigger Flux reconcile
+      - name: Commit digest to home-ops and trigger Flux reconcile
         env:
           DIGEST: ${{ needs.build.outputs.digest }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
+          # Update digest in home-ops so Flux deploys the exact image
+          git clone https://x-access-token:${GH_TOKEN}@github.com/phew-blue/home-ops.git /tmp/home-ops
+          cd /tmp/home-ops
+          sed -i "s|digest: \".*\"|digest: \"${DIGEST}\"|" kubernetes/apps/dev/scan/app/helmrelease.yaml
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add kubernetes/apps/dev/scan/app/helmrelease.yaml
+            git commit -m "chore(dev/scan): pin image digest"
+            git push
+          fi
+
+          # Trigger immediate Flux reconcile rather than waiting for polling interval
           curl -sSLo /tmp/kubectl "https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl"
           chmod +x /tmp/kubectl
-          if [ -n "$DIGEST" ]; then
-            /tmp/kubectl patch helmrelease scan -n dev --type=merge \
-              -p "{\"spec\":{\"values\":{\"controllers\":{\"main\":{\"containers\":{\"app\":{\"image\":{\"digest\":\"$DIGEST\"}}}}}}}}"
-          fi
           /tmp/kubectl annotate helmrelease scan -n dev \
             reconcile.fluxcd.io/requestedAt="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --overwrite

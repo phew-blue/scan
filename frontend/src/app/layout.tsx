@@ -17,7 +17,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-gray-950 text-gray-100 antialiased">
         <header className="border-b border-gray-800 px-6 py-3">
           <a href="/" aria-label="scan home">
-            <img src="/logo.svg" alt="scan" height="32" className="h-8" />
+            <img src="/logo.svg" alt="scan" className="h-8 w-8" />
           </a>
         </header>
         <main className="mx-auto max-w-3xl px-6 py-8">{children}</main>

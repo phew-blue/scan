@@ -62,6 +62,12 @@ func New(cfg *config.Config, store *db.Store) http.Handler {
 		r.Delete("/api/jobs/{id}", s.handleDeleteJob)
 		r.Post("/api/jobs/{id}/scans", s.handleAddScan)
 		r.Delete("/api/jobs/{id}/scans/{scanId}", s.handleDeleteScan)
+		r.Post("/api/jobs/{id}/patterns", s.handleAddJobPattern)
+		r.Delete("/api/jobs/{id}/patterns/{patternId}", s.handleRemoveJobPattern)
+
+		r.Get("/api/patterns", s.handleListPatterns)
+		r.Post("/api/patterns", s.handleCreatePattern)
+		r.Delete("/api/patterns/{id}", s.handleDeletePattern)
 	})
 
 	// Serve Next.js static export

@@ -19,6 +19,13 @@ type Store struct {
 	pool *pgxpool.Pool
 }
 
+type Pattern struct {
+	ID        uuid.UUID `json:"id"`
+	Name      string    `json:"name"`
+	Regex     string    `json:"regex"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type Job struct {
 	ID        uuid.UUID `json:"id"`
 	Title     string    `json:"title"`
@@ -36,7 +43,8 @@ type Scan struct {
 
 type JobWithScans struct {
 	Job
-	Scans []Scan `json:"scans"`
+	Scans    []Scan    `json:"scans"`
+	Patterns []Pattern `json:"patterns"`
 }
 
 func New(ctx context.Context, dbURL string) (*Store, error) {
@@ -130,7 +138,17 @@ func (s *Store) GetJob(ctx context.Context, id uuid.UUID) (*JobWithScans, error)
 		}
 		j.Scans = append(j.Scans, sc)
 	}
-	return &j, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	patterns, err := s.GetJobPatterns(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	j.Patterns = patterns
+
+	return &j, nil
 }
 
 func (s *Store) DeleteJob(ctx context.Context, id uuid.UUID) error {
@@ -154,3 +172,113 @@ func (s *Store) DeleteScan(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+// Pattern methods
+
+func (s *Store) ListPatterns(ctx context.Context) ([]Pattern, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT id, name, regex, created_at FROM patterns ORDER BY created_at ASC`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var patterns []Pattern
+	for rows.Next() {
+		var p Pattern
+		if err := rows.Scan(&p.ID, &p.Name, &p.Regex, &p.CreatedAt); err != nil {
+			return nil, err
+		}
+		patterns = append(patterns, p)
+	}
+	if patterns == nil {
+		patterns = []Pattern{}
+	}
+	return patterns, rows.Err()
+}
+
+func (s *Store) CreatePattern(ctx context.Context, name, regex string) (Pattern, error) {
+	var p Pattern
+	err := s.pool.QueryRow(ctx,
+		`INSERT INTO patterns (id, name, regex, created_at) VALUES (gen_random_uuid(), $1, $2, now()) RETURNING id, name, regex, created_at`,
+		name, regex,
+	).Scan(&p.ID, &p.Name, &p.Regex, &p.CreatedAt)
+	return p, err
+}
+
+func (s *Store) DeletePattern(ctx context.Context, id uuid.UUID) error {
+	_, err := s.pool.Exec(ctx, `DELETE FROM patterns WHERE id = $1`, id)
+	return err
+}
+
+// Job pattern methods
+
+func (s *Store) GetJobPatterns(ctx context.Context, jobID uuid.UUID) ([]Pattern, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT p.id, p.name, p.regex, p.created_at
+		 FROM patterns p
+		 JOIN job_patterns jp ON jp.pattern_id = p.id
+		 WHERE jp.job_id = $1
+		 ORDER BY p.created_at ASC`,
+		jobID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var patterns []Pattern
+	for rows.Next() {
+		var p Pattern
+		if err := rows.Scan(&p.ID, &p.Name, &p.Regex, &p.CreatedAt); err != nil {
+			return nil, err
+		}
+		patterns = append(patterns, p)
+	}
+	if patterns == nil {
+		patterns = []Pattern{}
+	}
+	return patterns, rows.Err()
+}
+
+func (s *Store) AddJobPattern(ctx context.Context, jobID, patternID uuid.UUID) error {
+	_, err := s.pool.Exec(ctx,
+		`INSERT INTO job_patterns (job_id, pattern_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+		jobID, patternID,
+	)
+	return err
+}
+
+func (s *Store) RemoveJobPattern(ctx context.Context, jobID, patternID uuid.UUID) error {
+	_, err := s.pool.Exec(ctx,
+		`DELETE FROM job_patterns WHERE job_id = $1 AND pattern_id = $2`,
+		jobID, patternID,
+	)
+	return err
+}
+
+// GetJobRegexes returns the compiled regex strings for a job's active patterns.
+// Returns nil if the job has no patterns (caller should fall back to global config).
+func (s *Store) GetJobRegexes(ctx context.Context, jobID uuid.UUID) ([]string, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT p.regex
+		 FROM patterns p
+		 JOIN job_patterns jp ON jp.pattern_id = p.id
+		 WHERE jp.job_id = $1`,
+		jobID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var regexes []string
+	for rows.Next() {
+		var r string
+		if err := rows.Scan(&r); err != nil {
+			return nil, err
+		}
+		regexes = append(regexes, r)
+	}
+	return regexes, rows.Err()
+}

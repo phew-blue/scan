@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback, Suspense } from "react";
+import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import { api, type Job, type JobWithScans, type Scan, formatOutput } from "@/lib/api";
+import { api, type Job, type JobWithScans, type Scan, type Pattern, formatOutput } from "@/lib/api";
 
 const Scanner = dynamic(() => import("@/components/Scanner"), { ssr: false });
 
@@ -23,16 +23,155 @@ const S = {
   } as React.CSSProperties,
 };
 
+/* ── Pattern dropdown with checkboxes ───────────────────── */
+function PatternDropdown({
+  allPatterns,
+  activeIds,
+  onAdd,
+  onRemove,
+}: {
+  allPatterns: Pattern[];
+  activeIds: Set<string>;
+  onAdd: (id: string) => void;
+  onRemove: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const label =
+    activeIds.size === 0
+      ? "NO FILTER"
+      : activeIds.size === 1
+      ? allPatterns.find((p) => activeIds.has(p.id))?.name ?? "1 PATTERN"
+      : `${activeIds.size} PATTERNS`;
+
+  return (
+    <div ref={ref} style={{ position: "relative", marginLeft: "auto" }}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        style={{
+          display: "flex", alignItems: "center", gap: "6px",
+          background: activeIds.size > 0 ? "var(--accent-dim)" : "var(--surface)",
+          border: `1px solid ${activeIds.size > 0 ? "var(--accent)" : "var(--border)"}`,
+          borderRadius: "4px",
+          color: activeIds.size > 0 ? "var(--accent)" : "var(--text-dim)",
+          padding: "4px 8px",
+          fontFamily: "'IBM Plex Mono', monospace",
+          fontSize: "10px",
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          cursor: "pointer",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {label}
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+          <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      {open && (
+        <div style={{
+          position: "absolute", right: 0, top: "calc(100% + 6px)",
+          background: "var(--surface)",
+          border: "1px solid var(--border-bright)",
+          borderRadius: "8px",
+          minWidth: "180px",
+          zIndex: 100,
+          overflow: "hidden",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+        }}>
+          {allPatterns.length === 0 ? (
+            <div style={{ padding: "12px 14px", ...S.label }}>
+              NO PATTERNS — add in settings
+            </div>
+          ) : (
+            allPatterns.map((p) => {
+              const checked = activeIds.has(p.id);
+              return (
+                <label
+                  key={p.id}
+                  style={{
+                    display: "flex", alignItems: "center", gap: "10px",
+                    padding: "10px 14px",
+                    cursor: "pointer",
+                    borderBottom: "1px solid var(--border)",
+                    background: checked ? "var(--accent-dim)" : "transparent",
+                    transition: "background 0.1s",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => checked ? onRemove(p.id) : onAdd(p.id)}
+                    style={{ accentColor: "var(--accent)", width: "14px", height: "14px", flexShrink: 0 }}
+                  />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{
+                      fontFamily: "'IBM Plex Mono', monospace",
+                      fontSize: "12px",
+                      color: checked ? "var(--accent)" : "var(--text)",
+                      letterSpacing: "0.04em",
+                    }}>
+                      {p.name}
+                    </div>
+                    <div style={{
+                      fontFamily: "'IBM Plex Mono', monospace",
+                      fontSize: "9px",
+                      color: "var(--text-dim)",
+                      marginTop: "2px",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}>
+                      {p.regex}
+                    </div>
+                  </div>
+                </label>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Job Detail ─────────────────────────────────────────── */
 function JobDetail({ id }: { id: string }) {
   const [job, setJob] = useState<JobWithScans | null>(null);
+  const [allPatterns, setAllPatterns] = useState<Pattern[]>([]);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [scanning, setScanning] = useState(true);
 
   useEffect(() => {
     api.getJob(id).then(setJob).catch(() => setError("Job not found"));
+    api.listPatterns().then(setAllPatterns).catch(console.error);
   }, [id]);
+
+  const activePatternIds = new Set(job?.patterns.map((p) => p.id) ?? []);
+
+  async function handleAddPattern(patternId: string) {
+    await api.addJobPattern(id, patternId);
+    const pattern = allPatterns.find((p) => p.id === patternId);
+    if (pattern) {
+      setJob((prev) => prev ? { ...prev, patterns: [...prev.patterns, pattern] } : prev);
+    }
+  }
+
+  async function handleRemovePattern(patternId: string) {
+    await api.removeJobPattern(id, patternId);
+    setJob((prev) => prev ? { ...prev, patterns: prev.patterns.filter((p) => p.id !== patternId) } : prev);
+  }
 
   const handleScan = useCallback(async (barcode: string) => {
     if (job?.scans.some((s) => s.barcode === barcode)) return;
@@ -102,7 +241,7 @@ function JobDetail({ id }: { id: string }) {
               })}
             </p>
           </div>
-          {/* Copy button — large touch target */}
+          {/* Copy button */}
           <button
             onClick={copyOutput}
             disabled={job.scans.length === 0}
@@ -140,8 +279,8 @@ function JobDetail({ id }: { id: string }) {
           </button>
         </div>
 
-        {/* Scan count pill */}
-        <div style={{ display: "flex", gap: "8px", marginTop: "12px", flexWrap: "wrap" }}>
+        {/* Scan count pills + pattern dropdown */}
+        <div style={{ display: "flex", gap: "8px", marginTop: "12px", flexWrap: "wrap", alignItems: "center" }}>
           <span style={{
             ...S.label,
             background: "var(--surface)",
@@ -175,6 +314,12 @@ function JobDetail({ id }: { id: string }) {
               {invalidScans.length} INVALID
             </span>
           )}
+          <PatternDropdown
+            allPatterns={allPatterns}
+            activeIds={activePatternIds}
+            onAdd={handleAddPattern}
+            onRemove={handleRemovePattern}
+          />
         </div>
       </div>
 
@@ -254,7 +399,6 @@ function JobDetail({ id }: { id: string }) {
                       INVALID
                     </span>
                   )}
-                  {/* Large delete touch target */}
                   <button
                     onClick={() => removeScan(scan)}
                     style={{
@@ -481,7 +625,7 @@ function JobList() {
                   </p>
                 </div>
 
-                {/* Delete — large touch target */}
+                {/* Delete */}
                 <button
                   onClick={(e) => deleteJob(e, job.id)}
                   style={{

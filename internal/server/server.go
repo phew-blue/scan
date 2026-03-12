@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/phew-blue/scan/internal/config"
 	"github.com/phew-blue/scan/internal/db"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/oauth2"
 )
 
@@ -20,6 +21,7 @@ type Server struct {
 	store        *db.Store
 	oidcProvider *oidc.Provider
 	oauth2Config *oauth2.Config
+	limiter      *ipLimiter
 }
 
 func New(cfg *config.Config, store *db.Store) http.Handler {
@@ -31,11 +33,17 @@ func New(cfg *config.Config, store *db.Store) http.Handler {
 	}
 
 	s.initValidation()
+	s.initAccessPassword()
+	s.limiter = newIPLimiter()
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RealIP)
+	r.Use(securityHeaders)
+
+	// Metrics endpoint (public, no auth)
+	r.Get("/metrics", promhttp.Handler().ServeHTTP)
 
 	// Auth routes (public)
 	r.Get("/auth/login", s.handleLogin)
@@ -76,4 +84,15 @@ func New(cfg *config.Config, store *db.Store) http.Handler {
 	})
 
 	return r
+}
+
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("Permissions-Policy", "camera=(self), microphone=()")
+		w.Header().Set("X-XSS-Protection", "1; mode=block")
+		next.ServeHTTP(w, r)
+	})
 }

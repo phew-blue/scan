@@ -5,7 +5,6 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
-	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -16,6 +15,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/oauth2"
 )
 
@@ -108,6 +108,7 @@ var loginTmpl = template.Must(template.New("login").Parse(`<!DOCTYPE html>
   {{if .HasPassword}}
   {{if .HasOIDC}}<div class="divider">OR</div>{{end}}
   <form class="form" method="POST" action="/auth/password">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
     <input type="password" name="password" placeholder="Enter password" autofocus autocomplete="current-password">
     {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
     <button type="submit" class="btn btn-submit">SIGN IN</button>
@@ -121,17 +122,32 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	hasOIDC := s.oauth2Config != nil
 	hasPassword := s.cfg.AccessPassword != ""
 
-	// If only OIDC configured, go straight there
 	if hasOIDC && !hasPassword {
 		s.handleOIDCRedirect(w, r)
 		return
 	}
+
+	csrfToken, err := randomString(32)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     "scan_csrf",
+		Value:    csrfToken,
+		Path:     "/",
+		MaxAge:   300,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	loginTmpl.Execute(w, map[string]any{ //nolint:errcheck
 		"HasOIDC":     hasOIDC,
 		"HasPassword": hasPassword,
 		"Error":       r.URL.Query().Get("error"),
+		"CSRFToken":   csrfToken,
 	})
 }
 
@@ -153,14 +169,45 @@ func (s *Server) handleOIDCRedirect(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, s.oauth2Config.AuthCodeURL(state), http.StatusFound)
 }
 
+func (s *Server) initAccessPassword() {
+	if s.cfg.AccessPassword == "" {
+		return
+	}
+	if strings.HasPrefix(s.cfg.AccessPassword, "$2") {
+		return // already a bcrypt hash
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(s.cfg.AccessPassword), bcrypt.DefaultCost)
+	if err != nil {
+		slog.Error("failed to hash access password", "err", err)
+		return
+	}
+	slog.Warn("SCAN_ACCESS_PASSWORD is stored as plaintext — consider storing the bcrypt hash instead")
+	s.cfg.AccessPassword = string(hash)
+}
+
 func (s *Server) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
+	ip := realIP(r)
+	if !s.limiter.allow(ip) {
+		authFailuresTotal.WithLabelValues("password").Inc()
+		http.Redirect(w, r, "/auth/login?error=too+many+attempts,+try+again+later", http.StatusFound)
+		return
+	}
 	if err := r.ParseForm(); err != nil {
 		http.Redirect(w, r, "/auth/login?error=invalid+request", http.StatusFound)
 		return
 	}
+	// CSRF check
+	csrfCookie, err := r.Cookie("scan_csrf")
+	if err != nil || r.FormValue("csrf_token") == "" || csrfCookie.Value != r.FormValue("csrf_token") {
+		http.Redirect(w, r, "/auth/login?error=invalid+request", http.StatusFound)
+		return
+	}
+	http.SetCookie(w, &http.Cookie{Name: "scan_csrf", MaxAge: -1, Path: "/"})
+
 	provided := r.FormValue("password")
-	expected := s.cfg.AccessPassword
-	if subtle.ConstantTimeCompare([]byte(provided), []byte(expected)) != 1 {
+	if err := bcrypt.CompareHashAndPassword([]byte(s.cfg.AccessPassword), []byte(provided)); err != nil {
+		authFailuresTotal.WithLabelValues("password").Inc()
+		slog.Warn("failed password login attempt", "ip", ip)
 		http.Redirect(w, r, "/auth/login?error=incorrect+password", http.StatusFound)
 		return
 	}

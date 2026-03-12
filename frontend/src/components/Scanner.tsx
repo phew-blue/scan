@@ -73,60 +73,59 @@ export default function Scanner({ onScan, disabled }: Props) {
         overflow: "hidden",
         position: "relative",
       }}>
-        {cameraActive ? (
-          <div style={{ position: "relative" }}>
-            <video
-              ref={videoRef}
-              style={{ width: "100%", maxHeight: "260px", objectFit: "cover", display: "block" }}
-              muted
-              playsInline
-            />
-            {/* Scan overlay */}
+        {/* Video always in DOM so videoRef is available when startCamera runs */}
+        <div style={{ position: "relative", display: cameraActive ? "block" : "none" }}>
+          <video
+            ref={videoRef}
+            style={{ width: "100%", maxHeight: "260px", objectFit: "cover", display: "block" }}
+            muted
+            playsInline
+          />
+          {/* Scan overlay */}
+          <div style={{
+            position: "absolute", inset: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            pointerEvents: "none",
+          }}>
+            {[
+              { top: "50%", left: "50%", transform: "translate(-96px, -36px)", borderTop: "2px solid var(--accent)", borderLeft: "2px solid var(--accent)" },
+              { top: "50%", left: "50%", transform: "translate(80px, -36px)", borderTop: "2px solid var(--accent)", borderRight: "2px solid var(--accent)" },
+              { top: "50%", left: "50%", transform: "translate(-96px, 20px)", borderBottom: "2px solid var(--accent)", borderLeft: "2px solid var(--accent)" },
+              { top: "50%", left: "50%", transform: "translate(80px, 20px)", borderBottom: "2px solid var(--accent)", borderRight: "2px solid var(--accent)" },
+            ].map((s, i) => (
+              <div key={i} style={{ position: "absolute", width: "16px", height: "16px", ...s }} />
+            ))}
             <div style={{
-              position: "absolute", inset: 0,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              pointerEvents: "none",
-            }}>
-              {/* Corner marks */}
-              {[
-                { top: "50%", left: "50%", transform: "translate(-96px, -36px)", borderTop: "2px solid var(--accent)", borderLeft: "2px solid var(--accent)" },
-                { top: "50%", left: "50%", transform: "translate(80px, -36px)", borderTop: "2px solid var(--accent)", borderRight: "2px solid var(--accent)" },
-                { top: "50%", left: "50%", transform: "translate(-96px, 20px)", borderBottom: "2px solid var(--accent)", borderLeft: "2px solid var(--accent)" },
-                { top: "50%", left: "50%", transform: "translate(80px, 20px)", borderBottom: "2px solid var(--accent)", borderRight: "2px solid var(--accent)" },
-              ].map((s, i) => (
-                <div key={i} style={{ position: "absolute", width: "16px", height: "16px", ...s }} />
-              ))}
-              {/* Scan line */}
-              <div style={{
-                position: "absolute",
-                left: "50%",
-                top: "50%",
-                transform: "translateX(-80px) translateY(-28px)",
-                width: "160px",
-                height: "2px",
-                background: "linear-gradient(90deg, transparent, var(--accent), transparent)",
-                boxShadow: "0 0 8px var(--accent)",
-              }} className="scan-line" />
-            </div>
-            <button
-              onClick={stopCamera}
-              style={{
-                position: "absolute", top: "10px", right: "10px",
-                background: "rgba(8,12,15,0.85)",
-                border: "1px solid var(--border-bright)",
-                borderRadius: "6px",
-                color: "var(--text-dim)",
-                padding: "6px 12px",
-                fontSize: "12px",
-                fontFamily: "'IBM Plex Mono', monospace",
-                cursor: "pointer",
-                letterSpacing: "0.05em",
-              }}
-            >
-              STOP
-            </button>
+              position: "absolute",
+              left: "50%",
+              top: "50%",
+              transform: "translateX(-80px) translateY(-28px)",
+              width: "160px",
+              height: "2px",
+              background: "linear-gradient(90deg, transparent, var(--accent), transparent)",
+              boxShadow: "0 0 8px var(--accent)",
+            }} className="scan-line" />
           </div>
-        ) : (
+          <button
+            onClick={stopCamera}
+            style={{
+              position: "absolute", top: "10px", right: "10px",
+              background: "rgba(8,12,15,0.85)",
+              border: "1px solid var(--border-bright)",
+              borderRadius: "6px",
+              color: "var(--text-dim)",
+              padding: "6px 12px",
+              fontSize: "12px",
+              fontFamily: "'IBM Plex Mono', monospace",
+              cursor: "pointer",
+              letterSpacing: "0.05em",
+            }}
+          >
+            STOP
+          </button>
+        </div>
+
+        {!cameraActive && (
           <button
             onClick={startCamera}
             disabled={disabled}

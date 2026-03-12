@@ -49,7 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               letterSpacing: "0.05em",
               color: "var(--accent)",
             }}>
-              scan
+              BARCODE SCANNER
             </span>
           </a>
         </header>

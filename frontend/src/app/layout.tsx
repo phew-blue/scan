@@ -52,6 +52,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               BARCODE SCANNER
             </span>
           </a>
+          <span style={{
+            fontFamily: "'IBM Plex Mono', monospace",
+            fontSize: "11px",
+            color: "var(--text-dim)",
+            letterSpacing: "0.05em",
+          }}>
+            {process.env.NEXT_PUBLIC_APP_VERSION ?? "dev"}
+          </span>
         </header>
         <main style={{ flex: 1, width: "100%", maxWidth: "640px", margin: "0 auto", padding: "0" }}>
           {children}

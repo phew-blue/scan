@@ -38,6 +38,10 @@ jobs:
           tags: |
             type=raw,value=dev
 
+      - name: Get short SHA
+        id: vars
+        run: echo "sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
       - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         id: build
         with:
@@ -46,7 +50,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: BUILD_VERSION=dev
+          build-args: |
+            BUILD_VERSION=dev
+            NEXT_PUBLIC_APP_VERSION=dev:${{ steps.vars.outputs.sha }}
           provenance: false
           cache-from: type=registry,ref=${{ env.REGISTRY }}/phew-blue/scan:dev
           cache-to: type=inline

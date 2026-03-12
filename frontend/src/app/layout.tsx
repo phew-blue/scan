@@ -46,21 +46,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               fontFamily: "'IBM Plex Mono', monospace",
               fontSize: "13px",
               fontWeight: 600,
-              letterSpacing: "0.1em",
+              letterSpacing: "0.05em",
               color: "var(--accent)",
-              textTransform: "uppercase",
             }}>
-              SCAN
+              scan
             </span>
           </a>
-          <span style={{
-            fontFamily: "'IBM Plex Mono', monospace",
-            fontSize: "10px",
-            color: "var(--text-dim)",
-            letterSpacing: "0.05em",
-          }}>
-            XYTECH MEDIA PULSE
-          </span>
         </header>
         <main style={{ flex: 1, width: "100%", maxWidth: "640px", margin: "0 auto", padding: "0" }}>
           {children}

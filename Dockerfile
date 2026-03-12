@@ -1,5 +1,5 @@
 # ── Stage 1: Build Next.js frontend ──────────────────────────────────────────
-FROM node:24-slim AS frontend-builder
+FROM node:24-slim@sha256:e8e2e91b1378f83c5b2dd15f0247f34110e2fe895f6ca7719dbb780f929368eb AS frontend-builder
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable pnpm
@@ -12,7 +12,7 @@ ENV NEXT_PUBLIC_APP_VERSION=$NEXT_PUBLIC_APP_VERSION
 RUN pnpm run build
 
 # ── Stage 2: Build Go binary ──────────────────────────────────────────────────
-FROM golang:1.23-alpine AS go-builder
+FROM golang:1.26-alpine@sha256:2389ebfa5b7f43eeafbd6be0c3700cc46690ef842ad962f6c5bd6be49ed82039 AS go-builder
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
@@ -23,7 +23,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -o scan ./cmd/scan
 
 # ── Stage 3: Final image ──────────────────────────────────────────────────────
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:a9329520abc449e3b14d5bc3a6ffae065bdde0f02667fa10880c49b35c109fd1
 WORKDIR /app
 COPY --from=go-builder /app/scan ./scan
 COPY --from=frontend-builder /app/frontend/out ./frontend/out

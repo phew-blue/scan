@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# skill: generate-commit-message
+# description: Generate conventional commit message from staged changes for scan
+# usage: generate-commit-message
+
+set -euo pipefail
+
+echo "Analyzing staged changes..."
+echo ""
+
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+
+if [ -z "$STAGED_FILES" ]; then
+    echo "No staged changes found"
+    exit 1
+fi
+
+declare -A scopes
+
+while IFS= read -r file; do
+    case "$file" in
+        internal/server/*)    scopes["server"]=1 ;;
+        internal/config/*)    scopes["config"]=1 ;;
+        internal/db/migrations/*) scopes["db"]=1 ;;
+        internal/db/*)        scopes["db"]=1 ;;
+        internal/version/*)   scopes["version"]=1 ;;
+        cmd/scan/*)           scopes["cmd"]=1 ;;
+        frontend/*)           scopes["frontend"]=1 ;;
+        Dockerfile)           scopes["docker"]=1 ;;
+        docker-compose*)      scopes["docker"]=1 ;;
+        go.mod|go.sum)        scopes["deps"]=1 ;;
+        .github/*)            scopes["ci"]=1 ;;
+        CLAUDE.md|.claude/*)  scopes["claude"]=1 ;;
+        README.md|*.md)       scopes["docs"]=1 ;;
+        kubernetes/*)         scopes["kubernetes"]=1 ;;
+        *)                    scopes["misc"]=1 ;;
+    esac
+done <<< "$STAGED_FILES"
+
+echo "Scopes detected:"
+printf '%s\n' "${!scopes[@]}" | sort | sed 's/^/  - /'
+echo ""
+
+SCOPE_LIST=$(printf '%s\n' "${!scopes[@]}" | sort | paste -sd, -)
+
+echo "Suggested scope: $SCOPE_LIST"
+read -p "Use this scope? (Y/n): " USE_SCOPE
+
+if [[ $USE_SCOPE =~ ^[Nn]$ ]]; then
+    read -p "Enter custom scope: " SCOPE_LIST
+fi
+
+echo ""
+echo "Common types: feat  fix  docs  refactor  chore  ci  build"
+read -p "Enter type: " TYPE
+
+if [ -z "$TYPE" ]; then
+    echo "Type cannot be empty"
+    exit 1
+fi
+
+echo ""
+read -p "Enter description: " DESCRIPTION
+
+if [ -z "$DESCRIPTION" ]; then
+    echo "Description cannot be empty"
+    exit 1
+fi
+
+if [ -n "$SCOPE_LIST" ]; then
+    COMMIT_MSG="$TYPE($SCOPE_LIST): $DESCRIPTION"
+else
+    COMMIT_MSG="$TYPE: $DESCRIPTION"
+fi
+
+echo ""
+echo "Generated commit message:"
+echo "---"
+echo "$COMMIT_MSG"
+echo "---"
+echo ""
+
+if [ ${#COMMIT_MSG} -gt 100 ]; then
+    echo "Warning: message is ${#COMMIT_MSG} chars (max 100) — consider shortening"
+    echo ""
+fi
+
+read -p "Commit with this message? (y/N): " DO_COMMIT
+
+if [[ $DO_COMMIT =~ ^[Yy]$ ]]; then
+    git commit -m "$COMMIT_MSG"
+    echo "Committed!"
+else
+    echo ""
+    echo "To commit manually:"
+    echo "  git commit -m \"$COMMIT_MSG\""
+fi

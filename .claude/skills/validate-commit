@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# skill: validate-commit
+# description: Validate commit message follows conventional commits format for scan
+# usage: validate-commit [message]
+#   If no message provided, validates the last commit
+
+set -euo pipefail
+
+MESSAGE="${*:-}"
+
+if [ -z "$MESSAGE" ]; then
+    MESSAGE=$(git log -1 --pretty=%B)
+    echo "Validating last commit message..."
+else
+    echo "Validating provided message..."
+fi
+
+echo ""
+echo "Message:"
+echo "---"
+echo "$MESSAGE"
+echo "---"
+echo ""
+
+VALID=true
+
+# Valid scopes: server, config, db, frontend, docker, deps, ci, claude, docs, kubernetes, version, cmd
+if ! echo "$MESSAGE" | head -1 | grep -qE "^(feat|fix|docs|style|refactor|perf|test|chore|ci|build|revert)(\([a-z0-9/_,-]+(, ?[a-z0-9/_,-]+)*\))?: .+"; then
+    echo "First line must follow format: type(scope): description"
+    echo "  Valid types: feat, fix, docs, style, refactor, perf, test, chore, ci, build, revert"
+    echo "  Valid scopes: server, config, db, frontend, docker, deps, ci, claude, docs, kubernetes, version, cmd"
+    echo "  Examples:"
+    echo "    feat(server): add export endpoint"
+    echo "    fix(config): remove required tag from session secret"
+    echo "    feat(frontend): add job search filter"
+    VALID=false
+fi
+
+FIRST_LINE=$(echo "$MESSAGE" | head -1)
+LENGTH=${#FIRST_LINE}
+if [ $LENGTH -gt 100 ]; then
+    echo "First line is too long ($LENGTH chars, max 100)"
+    VALID=false
+elif [ $LENGTH -gt 72 ]; then
+    echo "Warning: first line is long ($LENGTH chars, recommended max 72)"
+fi
+
+# Co-Authored-By should not be present
+if echo "$MESSAGE" | grep -qiE "Co-Authored-By:"; then
+    echo "Commit message should NOT contain 'Co-Authored-By' lines"
+    VALID=false
+fi
+
+# Warn on uppercase start of description
+if echo "$FIRST_LINE" | grep -qE "^[a-z]+(\([a-z0-9-/]+\))?: [A-Z]"; then
+    echo "Warning: description should start with lowercase"
+fi
+
+# Warn on trailing period
+if echo "$FIRST_LINE" | grep -qE "\.$"; then
+    echo "Warning: first line should not end with a period"
+fi
+
+echo ""
+if [ "$VALID" = true ]; then
+    echo "Commit message is valid"
+    exit 0
+else
+    echo "Commit message validation failed"
+    exit 1
+fi

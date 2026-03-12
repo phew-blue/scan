@@ -1,6 +1,38 @@
+# ── Go ────────────────────────────────────────────────────────────────────────
+# Compiled binaries
+/scan
+*.exe
+
+# Test output
+*.test
+*.out
+
+# ── Node / Frontend ───────────────────────────────────────────────────────────
+node_modules/
 frontend/node_modules/
-frontend/.next/
 frontend/out/
-*.env
+frontend/.next/
+
+# TypeScript incremental build cache
+*.tsbuildinfo
+
+# ── Environment ───────────────────────────────────────────────────────────────
+.env
 .env.*
 !.env.example
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/settings.json
+!.vscode/tasks.json
+.idea/
+*.swp
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+
+# ── Local overrides ───────────────────────────────────────────────────────────
+*.local
+!.claude/settings.local.json

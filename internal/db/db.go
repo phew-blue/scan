@@ -23,6 +23,7 @@ type Pattern struct {
 	ID        uuid.UUID `json:"id"`
 	Name      string    `json:"name"`
 	Regex     string    `json:"regex"`
+	IsDefault bool      `json:"is_default"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -62,6 +63,10 @@ func (s *Store) Close() {
 	s.pool.Close()
 }
 
+func (s *Store) Pool() *pgxpool.Pool {
+	return s.pool
+}
+
 func (s *Store) Migrate() error {
 	db := stdlib.OpenDBFromPool(s.pool)
 	defer db.Close()
@@ -82,6 +87,17 @@ func (s *Store) CreateJob(ctx context.Context, title string) (Job, error) {
 		`INSERT INTO jobs (id, title, created_at) VALUES (gen_random_uuid(), $1, now()) RETURNING id, title, created_at`,
 		title,
 	).Scan(&j.ID, &j.Title, &j.CreatedAt)
+	if err != nil {
+		return j, err
+	}
+
+	// Auto-apply all default patterns to new jobs.
+	_, err = s.pool.Exec(ctx,
+		`INSERT INTO job_patterns (job_id, pattern_id)
+		 SELECT $1, id FROM patterns WHERE is_default = true
+		 ON CONFLICT DO NOTHING`,
+		j.ID,
+	)
 	return j, err
 }
 
@@ -176,7 +192,7 @@ func (s *Store) DeleteScan(ctx context.Context, id uuid.UUID) error {
 
 func (s *Store) ListPatterns(ctx context.Context) ([]Pattern, error) {
 	rows, err := s.pool.Query(ctx,
-		`SELECT id, name, regex, created_at FROM patterns ORDER BY created_at ASC`,
+		`SELECT id, name, regex, is_default, created_at FROM patterns ORDER BY created_at ASC`,
 	)
 	if err != nil {
 		return nil, err
@@ -186,7 +202,7 @@ func (s *Store) ListPatterns(ctx context.Context) ([]Pattern, error) {
 	var patterns []Pattern
 	for rows.Next() {
 		var p Pattern
-		if err := rows.Scan(&p.ID, &p.Name, &p.Regex, &p.CreatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &p.Regex, &p.IsDefault, &p.CreatedAt); err != nil {
 			return nil, err
 		}
 		patterns = append(patterns, p)
@@ -200,9 +216,9 @@ func (s *Store) ListPatterns(ctx context.Context) ([]Pattern, error) {
 func (s *Store) CreatePattern(ctx context.Context, name, regex string) (Pattern, error) {
 	var p Pattern
 	err := s.pool.QueryRow(ctx,
-		`INSERT INTO patterns (id, name, regex, created_at) VALUES (gen_random_uuid(), $1, $2, now()) RETURNING id, name, regex, created_at`,
+		`INSERT INTO patterns (id, name, regex, created_at) VALUES (gen_random_uuid(), $1, $2, now()) RETURNING id, name, regex, is_default, created_at`,
 		name, regex,
-	).Scan(&p.ID, &p.Name, &p.Regex, &p.CreatedAt)
+	).Scan(&p.ID, &p.Name, &p.Regex, &p.IsDefault, &p.CreatedAt)
 	return p, err
 }
 
@@ -215,7 +231,7 @@ func (s *Store) DeletePattern(ctx context.Context, id uuid.UUID) error {
 
 func (s *Store) GetJobPatterns(ctx context.Context, jobID uuid.UUID) ([]Pattern, error) {
 	rows, err := s.pool.Query(ctx,
-		`SELECT p.id, p.name, p.regex, p.created_at
+		`SELECT p.id, p.name, p.regex, p.is_default, p.created_at
 		 FROM patterns p
 		 JOIN job_patterns jp ON jp.pattern_id = p.id
 		 WHERE jp.job_id = $1
@@ -230,7 +246,7 @@ func (s *Store) GetJobPatterns(ctx context.Context, jobID uuid.UUID) ([]Pattern,
 	var patterns []Pattern
 	for rows.Next() {
 		var p Pattern
-		if err := rows.Scan(&p.ID, &p.Name, &p.Regex, &p.CreatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &p.Regex, &p.IsDefault, &p.CreatedAt); err != nil {
 			return nil, err
 		}
 		patterns = append(patterns, p)

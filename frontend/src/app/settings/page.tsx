@@ -64,6 +64,11 @@ export default function SettingsPage() {
     }
   }
 
+  async function toggleDefault(id: string, current: boolean) {
+    await api.setPatternDefault(id, !current);
+    setPatterns((prev) => prev.map((p) => p.id === id ? { ...p, is_default: !current } : p));
+  }
+
   async function deletePattern(id: string) {
     if (!confirm("Delete this pattern? Jobs using it will fall back to the default filter.")) return;
     await api.deletePattern(id);
@@ -119,13 +124,26 @@ export default function SettingsPage() {
               }}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{
-                  fontFamily: "'IBM Plex Mono', monospace",
-                  fontSize: "14px", fontWeight: 600,
-                  color: "var(--text)", margin: 0,
-                }}>
-                  {p.name}
-                </p>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <p style={{
+                    fontFamily: "'IBM Plex Mono', monospace",
+                    fontSize: "14px", fontWeight: 600,
+                    color: "var(--text)", margin: 0,
+                  }}>
+                    {p.name}
+                  </p>
+                  {p.is_default && (
+                    <span style={{
+                      fontFamily: "'IBM Plex Mono', monospace",
+                      fontSize: "9px", letterSpacing: "0.1em",
+                      color: "var(--green)", background: "var(--green-dim)",
+                      border: "1px solid var(--green)",
+                      borderRadius: "3px", padding: "1px 5px",
+                    }}>
+                      DEFAULT
+                    </span>
+                  )}
+                </div>
                 <p style={{
                   fontFamily: "'IBM Plex Mono', monospace",
                   fontSize: "12px",
@@ -136,6 +154,23 @@ export default function SettingsPage() {
                   {p.regex}
                 </p>
               </div>
+              <button
+                onClick={() => toggleDefault(p.id, p.is_default)}
+                style={{
+                  flexShrink: 0,
+                  background: p.is_default ? "var(--green-dim)" : "var(--surface)",
+                  border: `1px solid ${p.is_default ? "var(--green)" : "var(--border)"}`,
+                  borderRadius: "6px",
+                  color: p.is_default ? "var(--green)" : "var(--text-dim)",
+                  padding: "4px 8px",
+                  fontFamily: "'IBM Plex Mono', monospace",
+                  fontSize: "9px", letterSpacing: "0.1em",
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                }}
+              >
+                {p.is_default ? "DEFAULT ✓" : "SET DEFAULT"}
+              </button>
               <button
                 onClick={() => deletePattern(p.id)}
                 style={{

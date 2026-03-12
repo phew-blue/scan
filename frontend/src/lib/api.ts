@@ -2,6 +2,7 @@ export interface Pattern {
   id: string;
   name: string;
   regex: string;
+  is_default: boolean;
   created_at: string;
 }
 
@@ -78,6 +79,12 @@ export const api = {
     request<Pattern>("/api/patterns", {
       method: "POST",
       body: JSON.stringify({ name, regex }),
+    }),
+
+  setPatternDefault: (id: string, isDefault: boolean) =>
+    request<void>(`/api/patterns/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ is_default: isDefault }),
     }),
 
   deletePattern: (id: string) =>

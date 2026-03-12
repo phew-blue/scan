@@ -165,6 +165,29 @@ func (s *Server) handleCreatePattern(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, pattern)
 }
 
+func (s *Server) handleSetPatternDefault(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid pattern id")
+		return
+	}
+	var body struct {
+		IsDefault bool `json:"is_default"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request")
+		return
+	}
+	if _, err := s.store.Pool().Exec(r.Context(),
+		`UPDATE patterns SET is_default = $1 WHERE id = $2`, body.IsDefault, id,
+	); err != nil {
+		slog.Error("set pattern default", "err", err)
+		writeError(w, http.StatusInternalServerError, "failed to update pattern")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *Server) handleDeletePattern(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {

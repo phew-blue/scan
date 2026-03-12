@@ -67,6 +67,7 @@ func New(cfg *config.Config, store *db.Store) http.Handler {
 
 		r.Get("/api/patterns", s.handleListPatterns)
 		r.Post("/api/patterns", s.handleCreatePattern)
+		r.Patch("/api/patterns/{id}", s.handleSetPatternDefault)
 		r.Delete("/api/patterns/{id}", s.handleDeletePattern)
 	})
 

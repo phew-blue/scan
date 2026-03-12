@@ -23,11 +23,21 @@ export default function Scanner({ onScan, disabled }: Props) {
   async function startCamera() {
     setCameraError("");
     try {
-      const { BrowserMultiFormatReader } = await import("@zxing/browser");
-      const reader = new BrowserMultiFormatReader();
+      const { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } = await import("@zxing/browser");
+      const hints = new Map();
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+        BarcodeFormat.CODE_128,
+        BarcodeFormat.CODE_39,
+        BarcodeFormat.EAN_13,
+        BarcodeFormat.EAN_8,
+        BarcodeFormat.QR_CODE,
+        BarcodeFormat.DATA_MATRIX,
+      ]);
+      hints.set(DecodeHintType.TRY_HARDER, true);
+      const reader = new BrowserMultiFormatReader(hints);
       readerRef.current = reader;
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
       });
       streamRef.current = stream;
       if (videoRef.current) {
@@ -87,24 +97,26 @@ export default function Scanner({ onScan, disabled }: Props) {
             display: "flex", alignItems: "center", justifyContent: "center",
             pointerEvents: "none",
           }}>
-            {[
-              { top: "50%", left: "50%", transform: "translate(-96px, -36px)", borderTop: "2px solid var(--accent)", borderLeft: "2px solid var(--accent)" },
-              { top: "50%", left: "50%", transform: "translate(80px, -36px)", borderTop: "2px solid var(--accent)", borderRight: "2px solid var(--accent)" },
-              { top: "50%", left: "50%", transform: "translate(-96px, 20px)", borderBottom: "2px solid var(--accent)", borderLeft: "2px solid var(--accent)" },
-              { top: "50%", left: "50%", transform: "translate(80px, 20px)", borderBottom: "2px solid var(--accent)", borderRight: "2px solid var(--accent)" },
-            ].map((s, i) => (
-              <div key={i} style={{ position: "absolute", width: "16px", height: "16px", ...s }} />
-            ))}
-            <div style={{
-              position: "absolute",
-              left: "50%",
-              top: "50%",
-              transform: "translateX(-80px) translateY(-28px)",
-              width: "160px",
-              height: "2px",
-              background: "linear-gradient(90deg, transparent, var(--accent), transparent)",
-              boxShadow: "0 0 8px var(--accent)",
-            }} className="scan-line" />
+            {/* Target box — corner marks + animated scan line inside */}
+            <div style={{ position: "relative", width: "220px", height: "80px" }}>
+              {/* Corner marks */}
+              {[
+                { top: 0, left: 0, borderTop: "2px solid var(--accent)", borderLeft: "2px solid var(--accent)" },
+                { top: 0, right: 0, borderTop: "2px solid var(--accent)", borderRight: "2px solid var(--accent)" },
+                { bottom: 0, left: 0, borderBottom: "2px solid var(--accent)", borderLeft: "2px solid var(--accent)" },
+                { bottom: 0, right: 0, borderBottom: "2px solid var(--accent)", borderRight: "2px solid var(--accent)" },
+              ].map((s, i) => (
+                <div key={i} style={{ position: "absolute", width: "16px", height: "16px", ...s }} />
+              ))}
+              {/* Scan line animates within the box using top: 0→100% */}
+              <div style={{
+                left: 0,
+                right: 0,
+                height: "2px",
+                background: "linear-gradient(90deg, transparent, var(--accent), transparent)",
+                boxShadow: "0 0 8px var(--accent)",
+              }} className="scan-line" />
+            </div>
           </div>
           <button
             onClick={stopCamera}

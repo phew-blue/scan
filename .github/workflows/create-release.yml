@@ -43,6 +43,9 @@ jobs:
             printf "## Initial Release\n\nFirst release of scan!\n\n" > changelog.md
           fi
 
+          # Append template with version substituted
+          sed "s/\${VERSION}/$VERSION/g" .github/release-notes-template.md >> changelog.md
+
       - name: Create GitHub Release
         uses: ncipollo/release-action@b7eabc95ff50cbeeedec83973935c8f306dfcd0b # v1
         with:

@@ -1,6 +1,8 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/kelseyhightower/envconfig"
@@ -17,7 +19,7 @@ type Config struct {
 	OIDCClientID     string `envconfig:"SCAN_OIDC_CLIENT_ID" required:"true"`
 	OIDCClientSecret string `envconfig:"SCAN_OIDC_CLIENT_SECRET" required:"true"`
 	OIDCRedirectURL  string `envconfig:"SCAN_OIDC_REDIRECT_URL" required:"true"`
-	SessionSecret    string `envconfig:"SCAN_SESSION_SECRET" required:"true"`
+	SessionSecret    string `envconfig:"SCAN_SESSION_SECRET"`
 	StaticDir        string `envconfig:"SCAN_STATIC_DIR" default:"./frontend/out"`
 	BarcodePattern   string `envconfig:"SCAN_BARCODE_PATTERN" default:"^TL\\d{8}$"`
 }
@@ -26,6 +28,13 @@ func Load() (*Config, error) {
 	var cfg Config
 	if err := envconfig.Process("", &cfg); err != nil {
 		return nil, err
+	}
+	if cfg.SessionSecret == "" {
+		b := make([]byte, 32)
+		if _, err := rand.Read(b); err != nil {
+			return nil, fmt.Errorf("generate session secret: %w", err)
+		}
+		cfg.SessionSecret = hex.EncodeToString(b)
 	}
 	return &cfg, nil
 }

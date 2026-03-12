@@ -53,6 +53,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </span>
           </a>
           <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+            <span style={{
+              fontFamily: "'IBM Plex Mono', monospace",
+              fontSize: "11px",
+              color: "var(--text-dim)",
+              letterSpacing: "0.05em",
+            }}>
+              {process.env.NEXT_PUBLIC_APP_VERSION ?? "dev"}
+            </span>
             <a
               href="/settings"
               aria-label="Settings"
@@ -63,14 +71,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
               </svg>
             </a>
-            <span style={{
-              fontFamily: "'IBM Plex Mono', monospace",
-              fontSize: "11px",
-              color: "var(--text-dim)",
-              letterSpacing: "0.05em",
-            }}>
-              {process.env.NEXT_PUBLIC_APP_VERSION ?? "dev"}
-            </span>
           </div>
         </header>
         <main style={{ flex: 1, width: "100%", maxWidth: "640px", margin: "0 auto", padding: "0" }}>

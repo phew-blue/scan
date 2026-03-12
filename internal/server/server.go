@@ -78,13 +78,16 @@ func New(cfg *config.Config, store *db.Store) http.Handler {
 	r.Group(func(r chi.Router) {
 		r.Use(s.authMiddleware)
 		r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
-			// Try the requested path, fall back to index.html for client-side routing
-			path := r.URL.Path
-			if path == "/" {
-				path = "/index.html"
-			}
-			if _, err := fs.Stat(staticFS, path[1:]); err != nil {
-				r.URL.Path = "/"
+			stripped := r.URL.Path[1:] // remove leading /
+			if stripped == "" {
+				r.URL.Path = "/index.html"
+			} else if _, err := fs.Stat(staticFS, stripped); err != nil {
+				// Try as a Next.js page directory (trailingSlash: true → path/index.html)
+				if _, err2 := fs.Stat(staticFS, stripped+"/index.html"); err2 == nil {
+					r.URL.Path = r.URL.Path + "/index.html"
+				} else {
+					r.URL.Path = "/"
+				}
 			}
 			fileServer.ServeHTTP(w, r)
 		})

@@ -1,5 +1,5 @@
 # ── Stage 1: Build Next.js frontend ──────────────────────────────────────────
-FROM node:24-slim AS frontend-builder
+FROM node:24-slim@sha256:e8e2e91b1378f83c5b2dd15f0247f34110e2fe895f6ca7719dbb780f929368eb AS frontend-builder
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable pnpm
@@ -21,7 +21,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -o scan ./cmd/scan
 
 # ── Stage 3: Final image ──────────────────────────────────────────────────────
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:a9329520abc449e3b14d5bc3a6ffae065bdde0f02667fa10880c49b35c109fd1
 WORKDIR /app
 COPY --from=go-builder /app/scan ./scan
 COPY --from=frontend-builder /app/frontend/out ./frontend/out

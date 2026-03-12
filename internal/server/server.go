@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-chi/chi/v5"
@@ -78,15 +79,21 @@ func New(cfg *config.Config, store *db.Store) http.Handler {
 	r.Group(func(r chi.Router) {
 		r.Use(s.authMiddleware)
 		r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
-			stripped := r.URL.Path[1:] // remove leading /
+			stripped := strings.TrimPrefix(r.URL.Path, "/")
 			if stripped == "" {
 				r.URL.Path = "/index.html"
-			} else if _, err := fs.Stat(staticFS, stripped); err != nil {
-				// Try as a Next.js page directory (trailingSlash: true → path/index.html)
-				if _, err2 := fs.Stat(staticFS, stripped+"/index.html"); err2 == nil {
-					r.URL.Path = r.URL.Path + "/index.html"
-				} else {
-					r.URL.Path = "/"
+			} else {
+				info, err := fs.Stat(staticFS, stripped)
+				if err != nil {
+					// File not found — try as a Next.js page dir (trailingSlash: true → path/index.html)
+					if _, err2 := fs.Stat(staticFS, stripped+"/index.html"); err2 == nil {
+						r.URL.Path = "/" + stripped + "/index.html"
+					} else {
+						r.URL.Path = "/"
+					}
+				} else if info.IsDir() {
+					// Serve index.html directly — avoids FileServer's 301 redirect that Safari rejects
+					r.URL.Path = "/" + strings.TrimSuffix(stripped, "/") + "/index.html"
 				}
 			}
 			fileServer.ServeHTTP(w, r)

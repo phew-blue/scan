@@ -4,6 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "scan",
   description: "Barcode scanner for media jobs",
+  icons: { icon: "/favicon.svg" },
 };
 
 export default function RootLayout({
@@ -14,9 +15,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-screen bg-gray-950 text-gray-100 antialiased">
-        <header className="border-b border-gray-800 px-6 py-4">
-          <a href="/" className="text-xl font-semibold tracking-tight text-white hover:text-gray-300">
-            scan
+        <header className="border-b border-gray-800 px-6 py-3">
+          <a href="/" aria-label="scan home">
+            <img src="/logo.svg" alt="scan" height="32" className="h-8" />
           </a>
         </header>
         <main className="mx-auto max-w-3xl px-6 py-8">{children}</main>

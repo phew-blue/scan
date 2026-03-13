@@ -49,7 +49,7 @@ jobs:
       - name: Create GitHub Release
         uses: ncipollo/release-action@b7eabc95ff50cbeeedec83973935c8f306dfcd0b # v1
         with:
-          name: scan ${{ steps.version.outputs.version }}
+          name: Scan ${{ steps.version.outputs.version }}
           bodyFile: changelog.md
           draft: false
           prerelease: ${{ steps.version.outputs.prerelease }}

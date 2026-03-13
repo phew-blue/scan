@@ -33,7 +33,6 @@ func New(cfg *config.Config, store *db.Store) http.Handler {
 		os.Exit(1)
 	}
 
-	s.initValidation()
 	s.initAccessPassword()
 	s.limiter = newIPLimiter()
 

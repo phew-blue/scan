@@ -96,9 +96,15 @@ export default function SettingsPage() {
           fontSize: "20px", fontWeight: 600, margin: 0,
           color: "var(--text)",
         }}>
-          Patterns
+          Settings
         </h1>
-        <p style={{ ...S.label, marginTop: "6px" }}>
+        <h2 style={{
+          fontSize: "14px", fontWeight: 600, margin: "16px 0 0",
+          color: "var(--text)",
+        }}>
+          Patterns
+        </h2>
+        <p style={{ ...S.label, marginTop: "4px" }}>
           Manage barcode validation patterns
         </p>
       </div>

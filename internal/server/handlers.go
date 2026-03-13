@@ -10,10 +10,18 @@ import (
 	"github.com/google/uuid"
 )
 
-var barcodeRe *regexp.Regexp
-
-func (s *Server) initValidation() {
-	barcodeRe = regexp.MustCompile(s.cfg.BarcodePattern)
+// validateBarcode returns true if barcode matches any of the given regex patterns.
+// If no patterns are provided, all barcodes are considered valid.
+func validateBarcode(barcode string, patterns []string) bool {
+	if len(patterns) == 0 {
+		return true
+	}
+	for _, rx := range patterns {
+		if re, err := regexp.Compile(rx); err == nil && re.MatchString(barcode) {
+			return true
+		}
+	}
+	return false
 }
 
 // Jobs
@@ -90,22 +98,11 @@ func (s *Server) handleAddScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Use job-specific patterns if any are set, otherwise fall back to global config.
-	valid := false
 	regexes, err := s.store.GetJobRegexes(r.Context(), id)
 	if err != nil {
 		slog.Error("get job regexes", "err", err)
 	}
-	if len(regexes) > 0 {
-		for _, rx := range regexes {
-			if re, compErr := regexp.Compile(rx); compErr == nil && re.MatchString(body.Barcode) {
-				valid = true
-				break
-			}
-		}
-	} else {
-		valid = barcodeRe.MatchString(body.Barcode)
-	}
+	valid := validateBarcode(body.Barcode, regexes)
 
 	scan, err := s.store.AddScan(r.Context(), id, body.Barcode, valid)
 	if err != nil {

@@ -19,10 +19,9 @@ type Config struct {
 	OIDCClientID     string `envconfig:"SCAN_OIDC_CLIENT_ID" required:"true"`
 	OIDCClientSecret string `envconfig:"SCAN_OIDC_CLIENT_SECRET" required:"true"`
 	OIDCRedirectURL  string `envconfig:"SCAN_OIDC_REDIRECT_URL" required:"true"`
-	SessionSecret    string `ignored:"true"`
+	SessionSecret    string `envconfig:"SCAN_SESSION_SECRET"`
 	AccessPassword   string `envconfig:"SCAN_ACCESS_PASSWORD"`
 	StaticDir        string `envconfig:"SCAN_STATIC_DIR" default:"./frontend/out"`
-	BarcodePattern   string `envconfig:"SCAN_BARCODE_PATTERN" default:"^TL\\d{8}$"`
 }
 
 func Load() (*Config, error) {

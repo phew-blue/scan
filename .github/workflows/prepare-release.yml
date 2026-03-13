@@ -41,7 +41,7 @@ jobs:
             -not -path "*/node_modules/*" \
             -type f \( -name "*.toml" -o -name "*.yaml" -o -name "*.yml" -o -name "*.json" \) \
             | xargs grep -l "${PREV_VERSION#v}" \
-            | xargs sed -i "s/v${PREV_VERSION#v}/${VERSION}/g; s/${PREV_VERSION#v}/${VERSION_NUMBER}/g"
+            | xargs --no-run-if-empty sed -i "s/v${PREV_VERSION#v}/${VERSION}/g; s/${PREV_VERSION#v}/${VERSION_NUMBER}/g"
 
       - name: Create pull request
         env:
@@ -51,7 +51,9 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b release/${{ inputs.version }}
           git add .
-          git commit -m "chore(release): ${{ inputs.version }}"
+          git diff --cached --quiet || git commit -m "chore(release): ${{ inputs.version }}"
+          # Ensure we always have a release commit for auto-tag to detect
+          git commit --allow-empty -m "chore(release): ${{ inputs.version }}"
           git push origin release/${{ inputs.version }}
 
           gh pr create \

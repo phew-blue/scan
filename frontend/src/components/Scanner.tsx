@@ -18,7 +18,18 @@ export default function Scanner({ onScan, disabled }: Props) {
   const lastScanRef = useRef<{ barcode: string; time: number } | null>(null);
 
   useEffect(() => {
-    startCamera();
+    // Auto-start only if the browser already has permission — avoids prompting
+    // on page load. If the Permissions API isn't supported (older Safari), fall
+    // back to auto-start and let the browser decide whether to prompt.
+    async function maybeAutoStart() {
+      try {
+        const status = await navigator.permissions.query({ name: "camera" as PermissionName });
+        if (status.state === "granted") startCamera();
+      } catch {
+        startCamera(); // Permissions API not supported — try anyway
+      }
+    }
+    maybeAutoStart();
     return () => { stopCamera(); };
   }, []);
 

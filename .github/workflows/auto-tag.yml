@@ -21,17 +21,22 @@ jobs:
           COMMIT_MSG=$(git log -1 --pretty=%s)
           echo "Commit: $COMMIT_MSG"
 
-          # Match: chore(release): v0.1.0
+          # Match: chore(release): v0.1.0  (squash/rebase merge)
+          # Match: Merge pull request #N from org/release/v0.1.0  (standard merge)
           if [[ "$COMMIT_MSG" =~ ^chore\(release\):\ (v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?)$ ]]; then
             VERSION="${BASH_REMATCH[1]}"
-            echo "Release commit detected — tagging $VERSION"
-
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git tag "$VERSION"
-            git push origin "$VERSION"
-
-            echo "Tagged and pushed $VERSION"
+          elif [[ "$COMMIT_MSG" =~ ^Merge\ pull\ request\ #[0-9]+\ from\ [^/]+/release/(v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?)$ ]]; then
+            VERSION="${BASH_REMATCH[1]}"
           else
             echo "Not a release commit — skipping"
+            exit 0
           fi
+
+          echo "Release commit detected — tagging $VERSION"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "$VERSION"
+          git push origin "$VERSION"
+
+          echo "Tagged and pushed $VERSION"

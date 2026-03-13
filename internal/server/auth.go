@@ -274,7 +274,11 @@ func (s *Server) handleCallback(w http.ResponseWriter, r *http.Request) {
 		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
-	http.Redirect(w, r, "/", http.StatusFound)
+	// Use a client-side redirect instead of HTTP 302 so Safari's ITP does not
+	// block the session cookie set during the cross-site OIDC redirect chain.
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprint(w, `<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=/"><title>Redirecting…</title></head><body><script>window.location.replace("/")</script></body></html>`) //nolint:errcheck
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {

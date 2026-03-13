@@ -74,29 +74,35 @@ func New(cfg *config.Config, store *db.Store) http.Handler {
 
 	// Serve Next.js static export
 	staticFS := os.DirFS(cfg.StaticDir)
-	fileServer := http.FileServer(http.FS(staticFS))
 
 	r.Group(func(r chi.Router) {
 		r.Use(s.authMiddleware)
 		r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
 			stripped := strings.TrimPrefix(r.URL.Path, "/")
+
+			// Resolve the file to serve without modifying r.URL.Path.
+			// We use http.ServeFileFS so it respects ETags / Last-Modified,
+			// and we never rewrite r.URL.Path to avoid Go's built-in
+			// FileServer redirect (it 301s any path ending in /index.html).
+			var filePath string
 			if stripped == "" {
-				r.URL.Path = "/index.html"
+				filePath = "index.html"
 			} else {
 				info, err := fs.Stat(staticFS, stripped)
 				if err != nil {
-					// File not found — try as a Next.js page dir (trailingSlash: true → path/index.html)
+					// Not found — try as a Next.js page dir (trailingSlash: true → path/index.html)
 					if _, err2 := fs.Stat(staticFS, stripped+"/index.html"); err2 == nil {
-						r.URL.Path = "/" + stripped + "/index.html"
+						filePath = stripped + "/index.html"
 					} else {
-						r.URL.Path = "/"
+						filePath = "index.html" // SPA fallback
 					}
 				} else if info.IsDir() {
-					// Serve index.html directly — avoids FileServer's 301 redirect that Safari rejects
-					r.URL.Path = "/" + strings.TrimSuffix(stripped, "/") + "/index.html"
+					filePath = strings.TrimSuffix(stripped, "/") + "/index.html"
+				} else {
+					filePath = stripped
 				}
 			}
-			fileServer.ServeHTTP(w, r)
+			http.ServeFileFS(w, r, staticFS, filePath)
 		})
 	})
 

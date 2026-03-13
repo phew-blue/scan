@@ -7,6 +7,25 @@ interface Props {
   disabled?: boolean;
 }
 
+function beep() {
+  try {
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = "square";
+    osc.frequency.value = 1046; // C6 — classic till beep frequency
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.12);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.12);
+    osc.onended = () => ctx.close();
+  } catch {
+    // AudioContext not available (e.g. server-side render) — ignore
+  }
+}
+
 export default function Scanner({ onScan, disabled }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -65,6 +84,7 @@ export default function Scanner({ onScan, disabled }: Props) {
             const last = lastScanRef.current;
             if (!last || last.barcode !== barcode || now - last.time > 2500) {
               lastScanRef.current = { barcode, time: now };
+              beep();
               onScan(barcode);
             }
           }
@@ -89,6 +109,7 @@ export default function Scanner({ onScan, disabled }: Props) {
     e.preventDefault();
     const val = manualInput.trim();
     if (val && !disabled) {
+      beep();
       onScan(val);
       setManualInput("");
       inputRef.current?.focus();

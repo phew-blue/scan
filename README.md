@@ -96,11 +96,14 @@ All settings are environment variables:
 
 ### Prometheus metrics
 
-| Metric                        | Type    | Labels              | Description                          |
-|-------------------------------|---------|---------------------|--------------------------------------|
-| `scan_auth_failures_total`    | Counter | `method`            | Failed authentication attempts       |
-| `scan_scans_total`            | Counter | `job_title`, `valid`| Barcodes scanned, by job and validity|
-| `scan_jobs_created_total`     | Counter | —                   | Jobs created                         |
+| Metric                       | Type    | Labels               | Description                                 |
+|------------------------------|---------|----------------------|---------------------------------------------|
+| `scan_auth_failures_total`   | Counter | `method`             | Failed authentication attempts              |
+| `scan_scans_total`           | Counter | `job_title`, `valid` | Barcodes scanned (cumulative), by job       |
+| `scan_jobs_created_total`    | Counter | —                    | Jobs created (cumulative)                   |
+| `scan_db_jobs_total`         | Gauge   | —                    | Current total jobs in the database          |
+| `scan_db_scans_total`        | Gauge   | `valid`              | Current total scans in the database         |
+| `scan_db_scans_by_job_total` | Gauge   | `job_title`, `valid` | Current scan counts per job in the database |
 
 ## Deployment
 
@@ -109,3 +112,7 @@ Deployed to the home-ops Kubernetes cluster via Flux:
 - **Production**: `kubernetes/apps/default/scan/` — deployed on tagged releases via `/release`
 
 Both deployments have Prometheus `ServiceMonitor` and Grafana dashboards (in the "Apps" folder) with Stats, Application Metrics, Database, and Logs panels.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

@@ -81,7 +81,7 @@ var loginTmpl = template.Must(template.New("login").Parse(`<!DOCTYPE html>
   * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
   body { font-family:'IBM Plex Mono',monospace; background:var(--bg); color:var(--text); min-height:100dvh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; }
   .card { width:100%; max-width:360px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:32px 24px; display:flex; flex-direction:column; gap:24px; }
-  .logo { display:flex; align-items:center; gap:10px; }
+  .logo { display:flex; align-items:center; justify-content:center; gap:10px; }
   .logo img { width:32px; height:32px; }
   .logo span { font-size:14px; font-weight:600; letter-spacing:.08em; color:var(--accent); }
   .divider { display:flex; align-items:center; gap:12px; color:var(--text-dim); font-size:11px; letter-spacing:.1em; }

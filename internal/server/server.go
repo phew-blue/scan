@@ -81,6 +81,11 @@ func New(cfg *config.Config, store *db.Store) http.Handler {
 	// Serve Next.js static export
 	staticFS := os.DirFS(cfg.StaticDir)
 
+	// Public static assets needed on the unauthenticated login page.
+	r.Get("/logo.svg", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFileFS(w, r, staticFS, "logo.svg")
+	})
+
 	r.Group(func(r chi.Router) {
 		r.Use(s.authMiddleware)
 		r.Get("/*", func(w http.ResponseWriter, r *http.Request) {

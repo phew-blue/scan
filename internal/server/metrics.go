@@ -40,9 +40,10 @@ func init() {
 // dbStatsCollector exposes live DB row counts as Prometheus gauges.
 // It is registered once per server instance in New().
 type dbStatsCollector struct {
-	store     *db.Store
-	jobsDesc  *prometheus.Desc
-	scansDesc *prometheus.Desc
+	store            *db.Store
+	jobsDesc         *prometheus.Desc
+	scansDesc        *prometheus.Desc
+	scansByJobDesc   *prometheus.Desc
 }
 
 func newDBStatsCollector(store *db.Store) *dbStatsCollector {
@@ -58,12 +59,18 @@ func newDBStatsCollector(store *db.Store) *dbStatsCollector {
 			"Current number of scans in the database, partitioned by validity.",
 			[]string{"valid"}, nil,
 		),
+		scansByJobDesc: prometheus.NewDesc(
+			"scan_db_scans_by_job_total",
+			"Current number of scans per job in the database, partitioned by validity.",
+			[]string{"job_title", "valid"}, nil,
+		),
 	}
 }
 
 func (c *dbStatsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.jobsDesc
 	ch <- c.scansDesc
+	ch <- c.scansByJobDesc
 }
 
 func (c *dbStatsCollector) Collect(ch chan<- prometheus.Metric) {
@@ -80,4 +87,14 @@ func (c *dbStatsCollector) Collect(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(c.jobsDesc, prometheus.GaugeValue, float64(stats.Jobs))
 	ch <- prometheus.MustNewConstMetric(c.scansDesc, prometheus.GaugeValue, float64(stats.ValidScans), "true")
 	ch <- prometheus.MustNewConstMetric(c.scansDesc, prometheus.GaugeValue, float64(stats.InvalidScans), "false")
+
+	statsByJob, err := c.store.GetStatsByJob(ctx)
+	if err != nil {
+		ch <- prometheus.NewInvalidMetric(c.scansByJobDesc, err)
+		return
+	}
+	for _, js := range statsByJob {
+		ch <- prometheus.MustNewConstMetric(c.scansByJobDesc, prometheus.GaugeValue, float64(js.ValidScans), js.JobTitle, "true")
+		ch <- prometheus.MustNewConstMetric(c.scansByJobDesc, prometheus.GaugeValue, float64(js.InvalidScans), js.JobTitle, "false")
+	}
 }

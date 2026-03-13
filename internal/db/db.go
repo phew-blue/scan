@@ -293,6 +293,41 @@ func (s *Store) GetStats(ctx context.Context) (Stats, error) {
 	return st, err
 }
 
+// JobScanStats holds per-job scan counts broken down by validity.
+type JobScanStats struct {
+	JobTitle     string
+	ValidScans   int64
+	InvalidScans int64
+}
+
+// GetStatsByJob returns live scan counts grouped by job title in a single round-trip.
+func (s *Store) GetStatsByJob(ctx context.Context) ([]JobScanStats, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT
+			j.title,
+			COUNT(s.id) FILTER (WHERE s.valid = true),
+			COUNT(s.id) FILTER (WHERE s.valid = false)
+		 FROM jobs j
+		 LEFT JOIN scans s ON s.job_id = j.id
+		 GROUP BY j.title
+		 ORDER BY j.title`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var stats []JobScanStats
+	for rows.Next() {
+		var js JobScanStats
+		if err := rows.Scan(&js.JobTitle, &js.ValidScans, &js.InvalidScans); err != nil {
+			return nil, err
+		}
+		stats = append(stats, js)
+	}
+	return stats, rows.Err()
+}
+
 // GetJobRegexes returns the compiled regex strings for a job's active patterns.
 // Returns nil if the job has no patterns (caller should fall back to global config).
 func (s *Store) GetJobRegexes(ctx context.Context, jobID uuid.UUID) ([]string, error) {

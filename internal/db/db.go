@@ -298,3 +298,39 @@ func (s *Store) GetJobRegexes(ctx context.Context, jobID uuid.UUID) ([]string, e
 	}
 	return regexes, rows.Err()
 }
+
+// GetJobTitleAndRegexes returns the job title and its pattern regexes in a single
+// round-trip. Returns an error if the job does not exist.
+func (s *Store) GetJobTitleAndRegexes(ctx context.Context, jobID uuid.UUID) (title string, regexes []string, err error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT j.title, p.regex
+		 FROM jobs j
+		 LEFT JOIN job_patterns jp ON jp.job_id = j.id
+		 LEFT JOIN patterns p ON p.id = jp.pattern_id
+		 WHERE j.id = $1`,
+		jobID,
+	)
+	if err != nil {
+		return "", nil, err
+	}
+	defer rows.Close()
+
+	found := false
+	for rows.Next() {
+		var regex *string
+		if err := rows.Scan(&title, &regex); err != nil {
+			return "", nil, err
+		}
+		found = true
+		if regex != nil {
+			regexes = append(regexes, *regex)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return "", nil, err
+	}
+	if !found {
+		return "", nil, fmt.Errorf("job not found")
+	}
+	return title, regexes, nil
+}

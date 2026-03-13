@@ -51,6 +51,8 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to create job")
 		return
 	}
+	jobsCreatedTotal.Inc()
+	slog.Info("job created", "job_id", job.ID, "title", job.Title)
 	writeJSON(w, http.StatusCreated, job)
 }
 
@@ -98,9 +100,10 @@ func (s *Server) handleAddScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	regexes, err := s.store.GetJobRegexes(r.Context(), id)
+	jobTitle, regexes, err := s.store.GetJobTitleAndRegexes(r.Context(), id)
 	if err != nil {
-		slog.Error("get job regexes", "err", err)
+		writeError(w, http.StatusNotFound, "job not found")
+		return
 	}
 	valid := validateBarcode(body.Barcode, regexes)
 
@@ -110,6 +113,12 @@ func (s *Server) handleAddScan(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to add scan")
 		return
 	}
+	validStr := "false"
+	if valid {
+		validStr = "true"
+	}
+	scansTotal.WithLabelValues(jobTitle, validStr).Inc()
+	slog.Info("scan added", "job_id", id, "job_title", jobTitle, "barcode", body.Barcode, "valid", valid)
 	writeJSON(w, http.StatusCreated, scan)
 }
 

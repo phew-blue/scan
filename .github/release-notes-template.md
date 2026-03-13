@@ -38,4 +38,5 @@ spec:
               SCAN_OIDC_CLIENT_ID: scan
               SCAN_OIDC_CLIENT_SECRET: <secret>
               SCAN_OIDC_REDIRECT_URL: https://<app-host>/auth/callback
+              SCAN_SESSION_SECRET: <min-32-char-random-secret>
 ```

@@ -1,3 +1,11 @@
+export interface Pattern {
+  id: string;
+  name: string;
+  regex: string;
+  is_default: boolean;
+  created_at: string;
+}
+
 export interface Job {
   id: string;
   title: string;
@@ -15,6 +23,7 @@ export interface Scan {
 
 export interface JobWithScans extends Job {
   scans: Scan[];
+  patterns: Pattern[];
 }
 
 const base = typeof window !== "undefined" ? "" : "http://localhost:8080";
@@ -54,6 +63,32 @@ export const api = {
 
   deleteScan: (jobId: string, scanId: string) =>
     request<void>(`/api/jobs/${jobId}/scans/${scanId}`, { method: "DELETE" }),
+
+  addJobPattern: (jobId: string, patternId: string) =>
+    request<void>(`/api/jobs/${jobId}/patterns`, {
+      method: "POST",
+      body: JSON.stringify({ pattern_id: patternId }),
+    }),
+
+  removeJobPattern: (jobId: string, patternId: string) =>
+    request<void>(`/api/jobs/${jobId}/patterns/${patternId}`, { method: "DELETE" }),
+
+  listPatterns: () => request<Pattern[]>("/api/patterns"),
+
+  createPattern: (name: string, regex: string) =>
+    request<Pattern>("/api/patterns", {
+      method: "POST",
+      body: JSON.stringify({ name, regex }),
+    }),
+
+  setPatternDefault: (id: string, isDefault: boolean) =>
+    request<void>(`/api/patterns/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ is_default: isDefault }),
+    }),
+
+  deletePattern: (id: string) =>
+    request<void>(`/api/patterns/${id}`, { method: "DELETE" }),
 };
 
 export function formatOutput(job: JobWithScans): string {

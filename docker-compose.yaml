@@ -26,7 +26,6 @@ services:
       SCAN_OIDC_CLIENT_ID: scan
       SCAN_OIDC_CLIENT_SECRET: changeme
       SCAN_OIDC_REDIRECT_URL: http://localhost:8080/auth/callback
-      SCAN_SESSION_SECRET: changeme-32-char-secret-here-ok
       SCAN_STATIC_DIR: ./frontend/out
     depends_on:
       postgres:

@@ -1,0 +1,31 @@
+---
+area/backend:
+  - changed-files:
+      - any-glob-to-any-file:
+          - cmd/**/*
+          - internal/**/*
+          - "*.go"
+          - go.mod
+          - go.sum
+
+area/frontend:
+  - changed-files:
+      - any-glob-to-any-file:
+          - frontend/**/*
+
+area/docker:
+  - changed-files:
+      - any-glob-to-any-file:
+          - Dockerfile
+          - docker-compose.yaml
+
+area/docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "*.md"
+          - docs/**/*
+
+area/github:
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/**/*

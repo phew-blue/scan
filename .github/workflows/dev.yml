@@ -12,8 +12,31 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
+  test:
+    name: Test
+    runs-on: home-ops
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test ./...
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: latest
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+        working-directory: frontend
+      - run: pnpm test
+        working-directory: frontend
+
   build:
     name: Build & push dev
+    needs: [test]
     runs-on: home-ops
     permissions:
       contents: read
@@ -38,6 +61,10 @@ jobs:
           tags: |
             type=raw,value=dev
 
+      - name: Get short SHA
+        id: vars
+        run: echo "sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
       - uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7
         id: build
         with:
@@ -46,7 +73,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: BUILD_VERSION=dev
+          build-args: |
+            BUILD_VERSION=dev
+            NEXT_PUBLIC_APP_VERSION=dev:${{ steps.vars.outputs.sha }}
           provenance: false
           cache-from: type=registry,ref=${{ env.REGISTRY }}/phew-blue/scan:dev
           cache-to: type=inline
@@ -56,16 +85,26 @@ jobs:
     needs: [build]
     runs-on: home-ops
     steps:
-      - name: Patch HelmRelease and trigger Flux reconcile
+      - name: Commit digest to home-ops and trigger Flux reconcile
         env:
           DIGEST: ${{ needs.build.outputs.digest }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
+          # Update digest in home-ops so Flux deploys the exact image
+          git clone https://x-access-token:${GH_TOKEN}@github.com/phew-blue/home-ops.git /tmp/home-ops
+          cd /tmp/home-ops
+          sed -i "s|digest: \".*\"|digest: \"${DIGEST}\"|" kubernetes/apps/dev/scan/app/helmrelease.yaml
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add kubernetes/apps/dev/scan/app/helmrelease.yaml
+            git commit -m "chore(dev/scan): pin image digest"
+            git push
+          fi
+
+          # Trigger immediate Flux reconcile rather than waiting for polling interval
           curl -sSLo /tmp/kubectl "https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl"
           chmod +x /tmp/kubectl
-          if [ -n "$DIGEST" ]; then
-            /tmp/kubectl patch helmrelease scan -n dev --type=merge \
-              -p "{\"spec\":{\"values\":{\"controllers\":{\"main\":{\"containers\":{\"app\":{\"image\":{\"digest\":\"$DIGEST\"}}}}}}}}"
-          fi
           /tmp/kubectl annotate helmrelease scan -n dev \
             reconcile.fluxcd.io/requestedAt="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --overwrite

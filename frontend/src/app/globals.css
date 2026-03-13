@@ -1,1 +1,86 @@
 @import "tailwindcss";
+
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap");
+
+:root {
+  --bg: #080c0f;
+  --surface: #0f1519;
+  --border: #1e2d35;
+  --border-bright: #2e4555;
+  --text: #e8eef2;
+  --text-dim: #5a7a8a;
+  --text-muted: #2e4555;
+  --accent: #00aaff;
+  --accent-dim: #003d5c;
+  --green: #00e676;
+  --green-dim: #003318;
+  --red: #ff4444;
+  --red-dim: #3a0a0a;
+  --amber: #ffaa00;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg);
+}
+
+body {
+  font-family: "IBM Plex Sans", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  overscroll-behavior: none;
+}
+
+/* Prevent zoom on input focus on iOS */
+input, select, textarea {
+  font-size: 16px !important;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 3px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-bright);
+  border-radius: 2px;
+}
+
+.mono {
+  font-family: "IBM Plex Mono", monospace;
+}
+
+/* Scan pulse animation */
+@keyframes scan-line {
+  0% { top: 0%; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+.scan-line {
+  position: absolute;
+  animation: scan-line 2s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.blink {
+  animation: blink 1s step-end infinite;
+}
+
+/* Touch feedback */
+.touch-active:active {
+  background: var(--border) !important;
+  transform: scale(0.98);
+}

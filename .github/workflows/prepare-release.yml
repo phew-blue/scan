@@ -32,16 +32,18 @@ jobs:
         run: |
           VERSION="${{ inputs.version }}"
           VERSION_NUMBER="${VERSION#v}"
-          PREV_VERSION=$(grep -r 'v[0-9]\+\.[0-9]\+\.[0-9]\+' go.mod | head -1 | grep -o 'v[0-9]*\.[0-9]*\.[0-9]*' | head -1 || echo "0.0.0")
+          PREV_VERSION=$(cat VERSION 2>/dev/null || echo "0.0.0")
 
-          echo "Bumping → $VERSION_NUMBER"
+          echo "Bumping $PREV_VERSION → $VERSION_NUMBER"
 
           find . \
             -not -path "*/.git/*" \
             -not -path "*/node_modules/*" \
             -type f \( -name "*.toml" -o -name "*.yaml" -o -name "*.yml" -o -name "*.json" \) \
-            | xargs grep -l "${PREV_VERSION#v}" \
-            | xargs sed -i "s/v${PREV_VERSION#v}/${VERSION}/g; s/${PREV_VERSION#v}/${VERSION_NUMBER}/g"
+            | xargs grep -l "$PREV_VERSION" \
+            | xargs --no-run-if-empty sed -i "s/v${PREV_VERSION}/${VERSION}/g; s/${PREV_VERSION}/${VERSION_NUMBER}/g"
+
+          echo "$VERSION_NUMBER" > VERSION
 
       - name: Create pull request
         env:
@@ -51,12 +53,12 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b release/${{ inputs.version }}
           git add .
-          git commit -m "chore(release): ${{ inputs.version }}"
+          git commit --allow-empty -m "chore(release): ${{ inputs.version }}"
           git push origin release/${{ inputs.version }}
 
-          gh pr create \
-            --title "chore(release): ${{ inputs.version }}" \
-            --body "Automated version bump for ${{ inputs.version }}. Merge to trigger auto-tag and release." \
-            --base main \
-            --head release/${{ inputs.version }} \
-            --repo phew-blue/scan
+          curl -s -X POST \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/phew-blue/scan/pulls \
+            -d "{\"title\":\"chore(release): ${{ inputs.version }}\",\"body\":\"Automated version bump for ${{ inputs.version }}. Merge to trigger auto-tag and release.\",\"head\":\"release/${{ inputs.version }}\",\"base\":\"main\"}" \
+            | grep '"url"' | head -1

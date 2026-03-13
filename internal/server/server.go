@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/phew-blue/scan/internal/config"
 	"github.com/phew-blue/scan/internal/db"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/oauth2"
 )
@@ -27,6 +28,12 @@ type Server struct {
 
 func New(cfg *config.Config, store *db.Store) http.Handler {
 	s := &Server{cfg: cfg, store: store}
+
+	if err := prometheus.Register(newDBStatsCollector(store)); err != nil {
+		if _, ok := err.(prometheus.AlreadyRegisteredError); !ok {
+			slog.Error("failed to register db stats collector", "err", err)
+		}
+	}
 
 	if err := s.setupOIDC(context.Background()); err != nil {
 		slog.Error("failed to setup OIDC", "err", err)

@@ -273,6 +273,26 @@ func (s *Store) RemoveJobPattern(ctx context.Context, jobID, patternID uuid.UUID
 	return err
 }
 
+// Stats holds current aggregate counts from the database.
+type Stats struct {
+	Jobs         int64
+	ValidScans   int64
+	InvalidScans int64
+}
+
+// GetStats returns live row counts for jobs and scans in a single round-trip.
+func (s *Store) GetStats(ctx context.Context) (Stats, error) {
+	var st Stats
+	err := s.pool.QueryRow(ctx,
+		`SELECT
+			(SELECT COUNT(*) FROM jobs),
+			COUNT(*) FILTER (WHERE valid = true),
+			COUNT(*) FILTER (WHERE valid = false)
+		 FROM scans`,
+	).Scan(&st.Jobs, &st.ValidScans, &st.InvalidScans)
+	return st, err
+}
+
 // GetJobRegexes returns the compiled regex strings for a job's active patterns.
 // Returns nil if the job has no patterns (caller should fall back to global config).
 func (s *Store) GetJobRegexes(ctx context.Context, jobID uuid.UUID) ([]string, error) {

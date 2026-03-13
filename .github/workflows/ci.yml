@@ -78,7 +78,9 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: BUILD_VERSION=${{ steps.meta.outputs.version }}
+          build-args: |
+            BUILD_VERSION=${{ steps.meta.outputs.version }}
+            NEXT_PUBLIC_APP_VERSION=${{ steps.meta.outputs.version }}
           provenance: false
           cache-from: type=gha,scope=scan
           cache-to: type=gha,mode=max,scope=scan

@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   prepare-release:
-    runs-on: home-ops
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
@@ -57,9 +57,8 @@ jobs:
           git commit --allow-empty -m "chore(release): ${{ inputs.version }}"
           git push origin release/${{ inputs.version }}
 
-          curl -s -X POST \
-            -H "Authorization: token $GH_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/phew-blue/scan/pulls \
-            -d "{\"title\":\"chore(release): ${{ inputs.version }}\",\"body\":\"Automated version bump for ${{ inputs.version }}. Merge to trigger auto-tag and release.\",\"head\":\"release/${{ inputs.version }}\",\"base\":\"main\"}" \
-            | grep '"url"' | head -1
+          gh pr create \
+            --title "chore(release): ${{ inputs.version }}" \
+            --body "Automated version bump for ${{ inputs.version }}. Merge to trigger auto-tag and release." \
+            --head "release/${{ inputs.version }}" \
+            --base main

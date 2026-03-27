@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   create-release:
-    runs-on: home-ops
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
@@ -64,7 +64,7 @@ jobs:
             echo "**Version:** ${{ steps.version.outputs.version }}"
             echo "**Prerelease:** ${{ steps.version.outputs.prerelease }}"
             echo ""
-            echo "**Release URL:** https://github.com/phew-blue/scan/releases/tag/${{ steps.version.outputs.version }}"
+            echo "**Release URL:** ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ steps.version.outputs.version }}"
             echo ""
             echo "🐳 Docker image will be built automatically and available shortly at:"
             echo "\`ghcr.io/phew-blue/scan:${{ steps.version.outputs.version }}\`"

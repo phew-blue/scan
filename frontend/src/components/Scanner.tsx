@@ -32,6 +32,8 @@ export default function Scanner({ onScan, disabled }: Props) {
   const [cameraActive, setCameraActive] = useState(false);
   const [manualInput, setManualInput] = useState("");
   const [cameraError, setCameraError] = useState("");
+  const [torchOn, setTorchOn] = useState(false);
+  const [torchSupported, setTorchSupported] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
   const readerRef = useRef<unknown>(null);
   const lastScanRef = useRef<{ barcode: string; time: number } | null>(null);
@@ -73,6 +75,9 @@ export default function Scanner({ onScan, disabled }: Props) {
         video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
       });
       streamRef.current = stream;
+      const track = stream.getVideoTracks()[0];
+      const caps = track?.getCapabilities() as MediaTrackCapabilities & { torch?: boolean };
+      setTorchSupported(!!caps?.torch);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
@@ -103,6 +108,20 @@ export default function Scanner({ onScan, disabled }: Props) {
       streamRef.current = null;
     }
     setCameraActive(false);
+    setTorchOn(false);
+    setTorchSupported(false);
+  }
+
+  async function toggleTorch() {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    const next = !torchOn;
+    try {
+      await track.applyConstraints({ advanced: [{ torch: next } as MediaTrackConstraintSet] });
+      setTorchOn(next);
+    } catch (err) {
+      console.error("torch error", err);
+    }
   }
 
   function submitManual(e: React.FormEvent) {
@@ -161,6 +180,36 @@ export default function Scanner({ onScan, disabled }: Props) {
               }} className="scan-line" />
             </div>
           </div>
+          {torchSupported && (
+            <button
+              onClick={toggleTorch}
+              title={torchOn ? "Torch on" : "Torch off"}
+              style={{
+                position: "absolute", top: "10px", left: "10px",
+                background: torchOn ? "rgba(8,12,15,0.95)" : "rgba(8,12,15,0.85)",
+                border: `1px solid ${torchOn ? "var(--accent)" : "var(--border-bright)"}`,
+                borderRadius: "6px",
+                color: torchOn ? "var(--accent)" : "var(--text-dim)",
+                padding: "6px 10px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {torchOn ? (
+                /* Filled bolt */
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M13 2L4.5 13.5H11L10 22L20.5 10H14L13 2Z" />
+                </svg>
+              ) : (
+                /* Outline bolt */
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="13 2 4.5 13.5 11 13.5 10 22 20.5 10 14 10 13 2" />
+                </svg>
+              )}
+            </button>
+          )}
           <button
             onClick={stopCamera}
             style={{

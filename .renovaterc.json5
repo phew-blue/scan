@@ -11,6 +11,7 @@
     ":semanticCommits",
   ],
   gitAuthor: "Phew-Blue-Renovate <renovate@phew.blue>",
+  baseBranches: ["dev"],
   dependencyDashboard: true,
   dependencyDashboardTitle: "Renovate Dashboard 🤖",
 

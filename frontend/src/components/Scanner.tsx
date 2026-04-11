@@ -198,14 +198,16 @@ export default function Scanner({ onScan, disabled }: Props) {
               }}
             >
               {torchOn ? (
-                /* Filled bolt */
+                /* Filled torch */
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M13 2L4.5 13.5H11L10 22L20.5 10H14L13 2Z" />
+                  <path d="M18 6c0 2-2 2-2 4v10a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2V10c0-2-2-2-2-4V2h12v4Z" />
+                  <line x1="6" y1="6" x2="18" y2="6" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
                 </svg>
               ) : (
-                /* Outline bolt */
+                /* Outline torch */
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="13 2 4.5 13.5 11 13.5 10 22 20.5 10 14 10 13 2" />
+                  <path d="M18 6c0 2-2 2-2 4v10a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2V10c0-2-2-2-2-4V2h12v4Z" />
+                  <line x1="6" y1="6" x2="18" y2="6" />
                 </svg>
               )}
             </button>

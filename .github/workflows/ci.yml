@@ -51,6 +51,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
@@ -95,3 +97,28 @@ jobs:
             echo "${{ steps.meta.outputs.tags }}"
             echo '```'
           } >> $GITHUB_STEP_SUMMARY
+
+  reconcile-prod:
+    name: Update home-ops
+    needs: [build]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Commit tag and digest to home-ops
+        env:
+          TAG: ${{ github.ref_name }}
+          DIGEST: ${{ needs.build.outputs.digest }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          git clone https://x-access-token:${GH_TOKEN}@github.com/phew-blue/home-ops.git /tmp/home-ops
+          cd /tmp/home-ops
+          HELMRELEASE="kubernetes/apps/default/scan/app/helmrelease.yaml"
+          sed -i "s|tag: v[0-9][^ ]*|tag: ${TAG}|" "$HELMRELEASE"
+          sed -i "s|digest: \"sha256:[a-f0-9]*\"|digest: \"${DIGEST}\"|" "$HELMRELEASE"
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add "$HELMRELEASE"
+            git commit -m "chore(scan): bump to ${TAG}"
+            git push
+          fi

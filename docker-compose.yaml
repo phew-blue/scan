@@ -3,7 +3,7 @@ services:
     image: postgres:18-alpine@sha256:4da1a4828be12604092fa55311276f08f9224a74a62dcb4708bd7439e2a03911
     environment:
       POSTGRES_USER: scan
-      POSTGRES_PASSWORD: scan
+      POSTGRES_PASSWORD: ${SCAN_DB_PASSWORD:-scan}
       POSTGRES_DB: scan
     ports:
       - "5432:5432"
@@ -20,12 +20,13 @@ services:
     environment:
       SCAN_DB_HOST: postgres
       SCAN_DB_USER: scan
-      SCAN_DB_PASSWORD: scan
+      SCAN_DB_PASSWORD: ${SCAN_DB_PASSWORD:-scan}
       SCAN_DB_NAME: scan
-      SCAN_OIDC_ISSUER: https://auth.example.com
-      SCAN_OIDC_CLIENT_ID: scan
-      SCAN_OIDC_CLIENT_SECRET: changeme
-      SCAN_OIDC_REDIRECT_URL: http://localhost:8080/auth/callback
+      SCAN_OIDC_ISSUER: ${SCAN_OIDC_ISSUER:-https://auth.example.com}
+      SCAN_OIDC_CLIENT_ID: ${SCAN_OIDC_CLIENT_ID:-scan}
+      SCAN_OIDC_CLIENT_SECRET: ${SCAN_OIDC_CLIENT_SECRET}
+      SCAN_OIDC_REDIRECT_URL: ${SCAN_OIDC_REDIRECT_URL:-http://localhost:8080/auth/callback}
+      SCAN_SESSION_SECRET: ${SCAN_SESSION_SECRET}
       SCAN_STATIC_DIR: ./frontend/out
     depends_on:
       postgres:

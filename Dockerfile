@@ -1,5 +1,5 @@
 # ── Stage 1: Build Next.js frontend ──────────────────────────────────────────
-FROM node:24-slim@sha256:e8e2e91b1378f83c5b2dd15f0247f34110e2fe895f6ca7719dbb780f929368eb AS frontend-builder
+FROM node:24-slim@sha256:b506e7321f176aae77317f99d67a24b272c1f09f1d10f1761f2773447d8da26c AS frontend-builder
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable pnpm
@@ -12,7 +12,7 @@ ENV NEXT_PUBLIC_APP_VERSION=$NEXT_PUBLIC_APP_VERSION
 RUN pnpm run build
 
 # ── Stage 2: Build Go binary ──────────────────────────────────────────────────
-FROM golang:1.26-alpine AS go-builder
+FROM golang:1.26-alpine@sha256:c2a1f7b2095d046ae14b286b18413a05bb82c9bca9b25fe7ff5efef0f0826166 AS go-builder
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download

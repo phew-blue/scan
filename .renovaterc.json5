@@ -10,37 +10,23 @@
     ":disableRateLimiting",
     ":semanticCommits",
   ],
+  gitAuthor: "Phew-Blue-Renovate <renovate@phew.blue>",
   dependencyDashboard: true,
   dependencyDashboardTitle: "Renovate Dashboard 🤖",
-  schedule: ["every weekend"],
 
   // Ignore scan's own image — managed via the release workflow
   ignoreDeps: ["ghcr.io/phew-blue/scan"],
 
   packageRules: [
-    // Auto-merge GitHub Actions minor/patch
     {
       description: "Auto-merge GitHub Actions minor and patch updates",
       matchManagers: ["github-actions"],
       automerge: true,
       automergeType: "branch",
       matchUpdateTypes: ["minor", "patch", "digest"],
-      minimumReleaseAge: "3 days",
+      minimumReleaseAge: "1 day",
       ignoreTests: true,
     },
-
-    // Auto-merge container minor and patch
-    {
-      description: "Auto-merge Container minor and patch updates",
-      matchDatasources: ["docker"],
-      automerge: true,
-      automergeType: "branch",
-      matchUpdateTypes: ["minor", "patch"],
-      minimumReleaseAge: "3 days",
-      ignoreTests: true,
-    },
-
-    // Auto-merge mise tools
     {
       description: "Auto-merge Mise tools minor and patch",
       matchManagers: ["mise"],
@@ -49,8 +35,15 @@
       matchUpdateTypes: ["minor", "patch"],
       ignoreTests: true,
     },
-
-    // Semantic commit types
+    {
+      description: "Auto-merge Container minor and patch",
+      matchDatasources: ["docker"],
+      automerge: true,
+      automergeType: "branch",
+      matchUpdateTypes: ["minor", "patch"],
+      minimumReleaseAge: "1 day",
+      ignoreTests: true,
+    },
     {
       matchUpdateTypes: ["major"],
       semanticCommitType: "feat",
@@ -72,8 +65,6 @@
       semanticCommitType: "chore",
       commitMessageExtra: "( {{currentDigestShort}} ➔ {{newDigestShort}} )",
     },
-
-    // Semantic commit scopes
     {
       matchDatasources: ["docker"],
       semanticCommitScope: "container",
@@ -86,6 +77,11 @@
       commitMessageTopic: "action {{depName}}",
     },
     {
+      matchDatasources: ["github-releases"],
+      semanticCommitScope: "github-release",
+      commitMessageTopic: "release {{depName}}",
+    },
+    {
       matchManagers: ["mise"],
       semanticCommitScope: "mise",
       commitMessageTopic: "tool {{depName}}",
@@ -95,8 +91,6 @@
       semanticCommitScope: "npm",
       commitMessageTopic: "package {{depName}}",
     },
-
-    // Labels
     {
       matchUpdateTypes: ["major"],
       labels: ["type/major"],
@@ -114,6 +108,10 @@
       addLabels: ["renovate/container"],
     },
     {
+      matchDatasources: ["github-releases"],
+      addLabels: ["renovate/github-release"],
+    },
+    {
       matchManagers: ["github-actions"],
       addLabels: ["renovate/github-action"],
     },
@@ -128,11 +126,13 @@
       description: "Process annotated dependencies",
       customType: "regex",
       managerFilePatterns: [
-        "/(^|/).+\\.ya?ml$/",
-        "/(^|/).+\\.sh$/",
+        "/(^|/).+\\.env(?:\\.j2)?$/",
+        "/(^|/).+\\.sh(?:\\.j2)?$/",
+        "/(^|/).+\\.ya?ml(?:\\.j2)?$/",
       ],
       matchStrings: [
         "datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)( repository=(?<registryUrl>\\S+))?\\n.+(:\\s|=)(&\\S+\\s)?(?<currentValue>\\S+)",
+        "datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n.+/(?<currentValue>(v|\\d)[^/]+)",
       ],
       datasourceTemplate: "{{#if datasource}}{{{datasource}}}{{else}}github-releases{{/if}}",
     },

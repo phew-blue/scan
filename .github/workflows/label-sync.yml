@@ -9,7 +9,7 @@ on:
 jobs:
   label-sync:
     name: Label Sync
-    runs-on: home-ops
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
       issues: write

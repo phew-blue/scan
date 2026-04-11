@@ -55,12 +55,12 @@ Or run directly:
 # Frontend dev server
 cd frontend && pnpm install && pnpm dev
 
-# Backend (separate terminal)
-export SCAN_DB_HOST=localhost SCAN_DB_PASSWORD=scan \
-       SCAN_OIDC_ISSUER=https://auth.example.com \
-       SCAN_OIDC_CLIENT_ID=scan SCAN_OIDC_CLIENT_SECRET=changeme \
+# Backend (separate terminal) — see .env.example for all variables
+export SCAN_DB_HOST=localhost SCAN_DB_PASSWORD=<db-password> \
+       SCAN_OIDC_ISSUER=<oidc-issuer-url> \
+       SCAN_OIDC_CLIENT_ID=<client-id> SCAN_OIDC_CLIENT_SECRET=<client-secret> \
        SCAN_OIDC_REDIRECT_URL=http://localhost:8080/auth/callback \
-       SCAN_SESSION_SECRET=changeme-at-least-32-chars-long
+       SCAN_SESSION_SECRET=<random-32-char-string>
 go run ./cmd/scan
 ```
 
@@ -104,14 +104,6 @@ All settings are environment variables:
 | `scan_db_jobs_total`         | Gauge   | —                    | Current total jobs in the database          |
 | `scan_db_scans_total`        | Gauge   | `valid`              | Current total scans in the database         |
 | `scan_db_scans_by_job_total` | Gauge   | `job_title`, `valid` | Current scan counts per job in the database |
-
-## Deployment
-
-Deployed to the home-ops Kubernetes cluster via Flux:
-- **Dev**: `kubernetes/apps/dev/scan/` — auto-deployed on every push to the `dev` branch
-- **Production**: `kubernetes/apps/default/scan/` — deployed on tagged releases via `/release`
-
-Both deployments have Prometheus `ServiceMonitor` and Grafana dashboards (in the "Apps" folder) with Stats, Application Metrics, Database, and Logs panels.
 
 ## License
 

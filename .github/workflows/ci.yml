@@ -16,10 +16,10 @@ env:
 jobs:
   lint:
     name: Go lint & test
-    runs-on: home-ops
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-      - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: go.mod
       - run: go vet ./...
@@ -47,7 +47,7 @@ jobs:
   build:
     name: Build & push
     needs: [lint, frontend-check]
-    runs-on: home-ops
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
       packages: write
@@ -56,7 +56,7 @@ jobs:
       - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
       - name: Log in to Container Registry
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -70,7 +70,7 @@ jobs:
             type=semver,pattern=v{{major}}.{{minor}}
             type=sha,prefix=sha-
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') && !contains(github.ref, 'alpha') && !contains(github.ref, 'beta') && !contains(github.ref, 'rc') }}
-      - uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7
+      - uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7
         id: build
         with:
           context: .
@@ -78,7 +78,9 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: BUILD_VERSION=${{ steps.meta.outputs.version }}
+          build-args: |
+            BUILD_VERSION=${{ steps.meta.outputs.version }}
+            NEXT_PUBLIC_APP_VERSION=${{ steps.meta.outputs.version }}
           provenance: false
           cache-from: type=gha,scope=scan
           cache-to: type=gha,mode=max,scope=scan

@@ -82,9 +82,12 @@ func New(cfg *config.Config, store *db.Store) http.Handler {
 	staticFS := os.DirFS(cfg.StaticDir)
 
 	// Public static assets needed on the unauthenticated login page.
-	r.Get("/logo.svg", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFileFS(w, r, staticFS, "logo.svg")
-	})
+	for _, f := range []string{"logo.svg", "favicon.svg"} {
+		f := f
+		r.Get("/"+f, func(w http.ResponseWriter, r *http.Request) {
+			http.ServeFileFS(w, r, staticFS, f)
+		})
+	}
 
 	r.Group(func(r chi.Router) {
 		r.Use(s.authMiddleware)

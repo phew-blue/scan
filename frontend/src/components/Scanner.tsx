@@ -34,9 +34,12 @@ export default function Scanner({ onScan, disabled }: Props) {
   const [cameraError, setCameraError] = useState("");
   const [torchOn, setTorchOn] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [zoomRange, setZoomRange] = useState<{ min: number; max: number; step: number } | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const readerRef = useRef<unknown>(null);
   const lastScanRef = useRef<{ barcode: string; time: number } | null>(null);
+  const pinchRef = useRef<{ startDist: number; startZoom: number } | null>(null);
 
   useEffect(() => {
     // Auto-start only if the browser already has permission — avoids prompting
@@ -72,12 +75,37 @@ export default function Scanner({ onScan, disabled }: Props) {
       const reader = new BrowserMultiFormatReader(hints);
       readerRef.current = reader;
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
+        video: {
+          facingMode: "environment",
+          width: { ideal: 2560 },
+          height: { ideal: 1440 },
+          // Continuous autofocus helps close-up subjects like small barcodes stay sharp.
+          // Cast: focusMode isn't in the standard MediaTrackConstraints type yet.
+          ...({ focusMode: "continuous" } as object),
+        },
       });
       streamRef.current = stream;
       const track = stream.getVideoTracks()[0];
-      const caps = track?.getCapabilities() as MediaTrackCapabilities & { torch?: boolean };
+      const caps = track?.getCapabilities() as MediaTrackCapabilities & {
+        torch?: boolean;
+        zoom?: { min: number; max: number; step: number };
+        focusMode?: string[];
+      };
       setTorchSupported(!!caps?.torch);
+      if (caps?.zoom && caps.zoom.max > caps.zoom.min) {
+        setZoomRange({ min: caps.zoom.min, max: caps.zoom.max, step: caps.zoom.step || 0.1 });
+        const settings = track.getSettings() as MediaTrackSettings & { zoom?: number };
+        setZoom(settings.zoom ?? caps.zoom.min);
+      } else {
+        setZoomRange(null);
+      }
+      if (caps?.focusMode?.includes("continuous")) {
+        try {
+          await track.applyConstraints({ advanced: [{ focusMode: "continuous" } as MediaTrackConstraintSet] });
+        } catch (err) {
+          console.debug("focusMode constraint not applied", err);
+        }
+      }
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
@@ -110,6 +138,41 @@ export default function Scanner({ onScan, disabled }: Props) {
     setCameraActive(false);
     setTorchOn(false);
     setTorchSupported(false);
+    setZoomRange(null);
+    setZoom(1);
+  }
+
+  async function applyZoom(next: number) {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track || !zoomRange) return;
+    const clamped = Math.min(zoomRange.max, Math.max(zoomRange.min, next));
+    try {
+      await track.applyConstraints({ advanced: [{ zoom: clamped } as MediaTrackConstraintSet] });
+      setZoom(clamped);
+    } catch (err) {
+      console.debug("zoom error", err);
+    }
+  }
+
+  function onTouchStart(e: React.TouchEvent) {
+    if (e.touches.length === 2 && zoomRange) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      pinchRef.current = { startDist: Math.hypot(dx, dy), startZoom: zoom };
+    }
+  }
+
+  function onTouchMove(e: React.TouchEvent) {
+    if (e.touches.length !== 2 || !pinchRef.current || !zoomRange) return;
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.hypot(dx, dy);
+    const ratio = dist / pinchRef.current.startDist;
+    applyZoom(pinchRef.current.startZoom * ratio);
+  }
+
+  function onTouchEnd() {
+    pinchRef.current = null;
   }
 
   async function toggleTorch() {
@@ -146,7 +209,12 @@ export default function Scanner({ onScan, disabled }: Props) {
         position: "relative",
       }}>
         {/* Video always in DOM so videoRef is available when startCamera runs */}
-        <div style={{ position: "relative", display: cameraActive ? "block" : "none" }}>
+        <div
+          style={{ position: "relative", display: cameraActive ? "block" : "none", touchAction: zoomRange ? "none" : "auto" }}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
           <video
             ref={videoRef}
             style={{ width: "100%", maxHeight: "260px", objectFit: "cover", display: "block" }}
@@ -229,6 +297,35 @@ export default function Scanner({ onScan, disabled }: Props) {
           >
             STOP
           </button>
+          {zoomRange && (
+            <div style={{
+              position: "absolute", bottom: "10px", left: "10px", right: "10px",
+              display: "flex", alignItems: "center", gap: "8px",
+              background: "rgba(8,12,15,0.85)",
+              border: "1px solid var(--border-bright)",
+              borderRadius: "6px",
+              padding: "6px 10px",
+            }}>
+              <span style={{
+                fontFamily: "'IBM Plex Mono', monospace",
+                fontSize: "11px",
+                color: "var(--text-dim)",
+                letterSpacing: "0.05em",
+                minWidth: "32px",
+              }}>
+                {zoom.toFixed(1)}×
+              </span>
+              <input
+                type="range"
+                min={zoomRange.min}
+                max={zoomRange.max}
+                step={zoomRange.step}
+                value={zoom}
+                onChange={(e) => applyZoom(parseFloat(e.target.value))}
+                style={{ flex: 1, accentColor: "var(--accent)" }}
+              />
+            </div>
+          )}
         </div>
 
         {!cameraActive && (

@@ -40,6 +40,8 @@ export default function Scanner({ onScan, disabled }: Props) {
   const readerRef = useRef<unknown>(null);
   const lastScanRef = useRef<{ barcode: string; time: number } | null>(null);
   const pinchRef = useRef<{ startDist: number; startZoom: number } | null>(null);
+  const decodeLoopRef = useRef<number | null>(null);
+  const decodeCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
     // Auto-start only if the browser already has permission — avoids prompting
@@ -110,19 +112,52 @@ export default function Scanner({ onScan, disabled }: Props) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
         setCameraActive(true);
-        reader.decodeFromStream(stream, videoRef.current, (result, err) => {
-          if (result && !disabled) {
-            const barcode = result.getText();
-            const now = Date.now();
-            const last = lastScanRef.current;
-            if (!last || last.barcode !== barcode || now - last.time > 2500) {
-              lastScanRef.current = { barcode, time: now };
-              beep();
-              onScan(barcode);
+
+        // Crop the center band of the video into an offscreen canvas and decode that.
+        // Linear barcodes occupy a wide-but-short region; restricting the decode
+        // area cuts noise from the rest of the frame and improves small-barcode hit rate.
+        const canvas = decodeCanvasRef.current ?? document.createElement("canvas");
+        decodeCanvasRef.current = canvas;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        const video = videoRef.current;
+
+        const tick = () => {
+          if (!streamRef.current || !ctx || video.readyState < 2) {
+            decodeLoopRef.current = window.setTimeout(tick, 150);
+            return;
+          }
+          const vw = video.videoWidth;
+          const vh = video.videoHeight;
+          // Center band: 85% wide, 45% tall — wide enough for linear codes,
+          // tall enough for QR/DataMatrix held in the reticle.
+          const cw = Math.floor(vw * 0.85);
+          const ch = Math.floor(vh * 0.45);
+          const sx = Math.floor((vw - cw) / 2);
+          const sy = Math.floor((vh - ch) / 2);
+          if (canvas.width !== cw) canvas.width = cw;
+          if (canvas.height !== ch) canvas.height = ch;
+          ctx.drawImage(video, sx, sy, cw, ch, 0, 0, cw, ch);
+          try {
+            const result = reader.decodeFromCanvas(canvas);
+            if (result && !disabled) {
+              const barcode = result.getText();
+              const now = Date.now();
+              const last = lastScanRef.current;
+              if (!last || last.barcode !== barcode || now - last.time > 2500) {
+                lastScanRef.current = { barcode, time: now };
+                beep();
+                onScan(barcode);
+              }
+            }
+          } catch (err) {
+            const name = (err as Error)?.name;
+            if (name && name !== "NotFoundException" && name !== "ChecksumException" && name !== "FormatException") {
+              console.debug("scan error", err);
             }
           }
-          if (err && err.name !== "NotFoundException") console.debug("scan error", err);
-        });
+          decodeLoopRef.current = window.setTimeout(tick, 120);
+        };
+        tick();
       }
     } catch (err) {
       setCameraError("Camera unavailable — use keyboard input below.");
@@ -131,6 +166,10 @@ export default function Scanner({ onScan, disabled }: Props) {
   }
 
   function stopCamera() {
+    if (decodeLoopRef.current !== null) {
+      clearTimeout(decodeLoopRef.current);
+      decodeLoopRef.current = null;
+    }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
@@ -228,7 +267,7 @@ export default function Scanner({ onScan, disabled }: Props) {
             pointerEvents: "none",
           }}>
             {/* Target box — corner marks + animated scan line inside */}
-            <div style={{ position: "relative", width: "220px", height: "80px" }}>
+            <div style={{ position: "relative", width: "85%", height: "45%" }}>
               {/* Corner marks */}
               {[
                 { top: 0, left: 0, borderTop: "2px solid var(--accent)", borderLeft: "2px solid var(--accent)" },

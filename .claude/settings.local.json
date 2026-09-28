@@ -50,7 +50,8 @@
       "Bash(tail:*)",
       "Bash(wc:*)",
       "Bash(sort:*)",
-      "Bash(uniq:*)"
+      "Bash(uniq:*)",
+      "Read(//home/coder/phew-blue/**)"
     ]
   }
 }
